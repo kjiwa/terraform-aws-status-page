@@ -21,7 +21,9 @@ function refresh(): Promise<string | null> {
   const refreshToken = config().refreshToken;
   if (!refreshToken) return Promise.resolve(null);
   if (refreshInFlight) return refreshInFlight;
-  refreshInFlight = refreshToken().catch(() => null);
+  refreshInFlight = Promise.resolve()
+    .then(refreshToken)
+    .catch(() => null);
   void refreshInFlight.finally(() => {
     refreshInFlight = null;
   });

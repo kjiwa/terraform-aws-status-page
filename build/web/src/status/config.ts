@@ -47,8 +47,11 @@ function checkFunction(raw: Raw, key: string, problems: string[]): void {
 function validate(raw: Raw): string[] {
   const problems: string[] = [];
   checkString(raw, 'pathPrefix', problems, true);
-  if (typeof raw.pathPrefix === 'string' && !raw.pathPrefix.startsWith('/')) {
-    problems.push('pathPrefix must start with "/".');
+  if (
+    typeof raw.pathPrefix === 'string' &&
+    (!raw.pathPrefix.startsWith('/') || raw.pathPrefix.startsWith('//'))
+  ) {
+    problems.push('pathPrefix must be a same-origin path starting with a single "/".');
   }
   checkString(raw, 'authHeader', problems, true);
   checkString(raw, 'title', problems, false);
