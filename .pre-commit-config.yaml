@@ -10,10 +10,31 @@ repos:
     hooks:
       - id: actionlint
 
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.9
+    hooks:
+      - id: ruff-check
+      - id: ruff-format
+
+  - repo: https://github.com/python-jsonschema/check-jsonschema
+    rev: 0.38.2
+    hooks:
+      - id: check-metaschema
+        files: ^modules/status/lambda/status_(payload|series)\.schema\.json$
+      - id: check-jsonschema
+        files: ^build/web/tests/fixtures/.*\.json$
+        exclude: ^build/web/tests/fixtures/series/
+        args: [--schemafile, modules/status/lambda/status_payload.schema.json]
+      # The series schema has no $id so its relative $refs resolve against
+      # its own path.
+      - id: check-jsonschema
+        files: ^build/web/tests/fixtures/series/.*\.json$
+        args: [--schemafile, modules/status/lambda/status_series.schema.json]
+
   - repo: local
     hooks:
       - id: hygiene
         name: hygiene
         entry: sh scripts/hygiene.sh
         language: system
-        exclude: ^LICENSE$
+        exclude: ^(LICENSE|build/web/package-lock\.json)$

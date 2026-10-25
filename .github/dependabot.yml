@@ -13,3 +13,19 @@ updates:
     directory: /
     schedule:
       interval: monthly
+
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      python:
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directory: /build/web
+    schedule:
+      interval: weekly
+    groups:
+      npm:
+        patterns: ["*"]

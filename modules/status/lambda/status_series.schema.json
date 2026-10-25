@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GET status/series response",
+  "description": "Single source of truth for series_response()'s shape in status.py. `data` restates no shape of its own: it $refs status_payload.schema.json's Reliability/HostMetrics/Bedrock/PanelError defs by relative path, since a panned single-range payload is exactly one of those subtrees. No $id, unlike status_payload.schema.json: an $id here would win over this file's own retrieval location as the base URI for its relative $refs.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "panel",
+    "range",
+    "end",
+    "data"
+  ],
+  "properties": {
+    "panel": {
+      "enum": [
+        "reliability",
+        "host_metrics",
+        "bedrock"
+      ]
+    },
+    "range": {
+      "$ref": "status_payload.schema.json#/$defs/RangeKey"
+    },
+    "end": {
+      "type": "string",
+      "description": "iso(end) -- the requested end, echoed back after clamping/parsing."
+    },
+    "data": {
+      "oneOf": [
+        {
+          "$ref": "status_payload.schema.json#/$defs/Reliability"
+        },
+        {
+          "$ref": "status_payload.schema.json#/$defs/HostMetrics"
+        },
+        {
+          "$ref": "status_payload.schema.json#/$defs/Bedrock"
+        },
+        {
+          "$ref": "status_payload.schema.json#/$defs/PanelError"
+        }
+      ]
+    }
+  }
+}
