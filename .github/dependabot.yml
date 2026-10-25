@@ -16,6 +16,13 @@ updates:
     groups:
       providers:
         patterns: ["*"]
+  - package-ecosystem: terraform
+    directory: /modules/status
+    schedule:
+      interval: weekly
+    groups:
+      providers:
+        patterns: ["*"]
 
   - package-ecosystem: pre-commit
     directory: /
