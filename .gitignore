@@ -11,3 +11,5 @@ node_modules/
 .claude/
 build/web/src/generated/
 modules/*/dist/*.zip
+build/web/test-results/
+build/web/playwright-report/

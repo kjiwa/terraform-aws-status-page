@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <meta name="theme-color" content="#ffffff" />
+    <!-- Empty data: URI: without an explicit favicon the browser requests
+         /favicon.ico from the app origin on every load. -->
+    <link rel="icon" href="data:," />
+    <title>Status</title>
+    <!-- The bundle loads <path prefix>/config.js, validates window.STATUS_CONFIG,
+         then mounts; see src/status/main.tsx. -->
+    <script type="module" src="/src/status/main.tsx"></script>
+    <link rel="stylesheet" href="/src/status/status.css" />
+  </head>
+  <body>
+    <header>
+      <h1 id="title">Status</h1>
+      <p id="who"></p>
+    </header>
+
+    <!-- Static skeleton, sized to the content each block will be replaced
+         by, so the swap causes no reflow. Sibling of #panels, not a parent:
+         Preact's render() corrupts a container that already holds foreign
+         DOM, so App.tsx removes this element outright instead. data-panel
+         names the disabledPanels entry that hides a block. -->
+    <div id="skeleton">
+      <h2 class="section-head">Service</h2>
+      <div class="card" data-panel="reliability">
+        <h3>Reliability</h3>
+        <div class="sk sk-stats"></div>
+        <div class="sk sk-strip"></div>
+        <div class="sk sk-chart"></div>
+      </div>
+      <div class="card" data-panel="incidents">
+        <h3>Incidents</h3>
+        <div class="sk sk-stats"></div>
+        <div class="sk sk-chart"></div>
+      </div>
+
+      <h2 class="section-head">Delivery</h2>
+      <div class="card" data-panel="deployment">
+        <h3>Deployment</h3>
+        <div class="subgrid">
+          <div class="sk sk-rows"></div>
+          <div class="sk sk-rows"></div>
+          <div class="sk sk-rows"></div>
+        </div>
+      </div>
+      <div class="card" data-panel="changes">
+        <h3>Changes</h3>
+        <div class="sk sk-rows"></div>
+      </div>
+
+      <h2 class="section-head">Data</h2>
+      <div class="card" data-panel="backups">
+        <h3>Backups</h3>
+        <div class="subgrid">
+          <div class="sk sk-rows"></div>
+          <div class="sk sk-rows"></div>
+        </div>
+      </div>
+      <div class="card" data-panel="storage">
+        <h3>Storage</h3>
+        <div class="subgrid">
+          <div class="sk sk-rows"></div>
+          <div class="sk sk-rows"></div>
+        </div>
+      </div>
+
+      <h2 class="section-head">Runtime</h2>
+      <div class="card" data-panel="host">
+        <h3>Host</h3>
+        <div class="subgrid">
+          <div class="sk sk-rows"></div>
+          <div class="sk sk-chart" data-panel="host_metrics"></div>
+        </div>
+      </div>
+      <div class="card" data-panel="bedrock">
+        <h3>Bedrock</h3>
+        <div class="subgrid">
+          <div class="sk sk-rows"></div>
+          <div>
+            <div class="sk sk-chart"></div>
+            <div class="sk sk-stats"></div>
+          </div>
+        </div>
+      </div>
+
+      <h2 class="section-head" data-panel="cost">Spend</h2>
+      <div class="card" data-panel="cost">
+        <h3>Cost (month to date)</h3>
+        <div class="sk sk-stats"></div>
+        <div class="sk sk-strip"></div>
+      </div>
+    </div>
+
+    <!-- Preact mount root; starts empty. -->
+    <div id="panels"></div>
+    <div id="gate" class="hidden"></div>
+    <div id="config-error" class="hidden" role="alert"></div>
+  </body>
+</html>
