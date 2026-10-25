@@ -14,22 +14,24 @@ output "shell_bucket_name" {
 }
 
 output "origins" {
-  description = "CloudFront origins to attach: the shell S3 bucket (OAC) and the Lambda Function URL (OAC; HTTPS-only custom origin, domain without scheme or slash)."
+  description = "CloudFront origins to attach: the shell S3 bucket (OAC) and the Lambda Function URL (OAC, custom_origin true: attach an HTTPS-only custom_origin_config; domain without scheme or slash)."
   value = [
     {
       origin_id                = local.origin_id_s3
       domain_name              = aws_s3_bucket.status_assets.bucket_regional_domain_name
       origin_access_control_id = aws_cloudfront_origin_access_control.status_assets.id
+      custom_origin            = false
     },
     {
       origin_id                = local.origin_id_lambda
       domain_name              = trimsuffix(trimprefix(aws_lambda_function_url.status.function_url, "https://"), "/")
       origin_access_control_id = aws_cloudfront_origin_access_control.status.id
+      custom_origin            = true
     },
   ]
 }
 
 output "behaviors" {
-  description = "CloudFront ordered cache behaviors to attach, in order; origin_request_policy_id and function_arn are null when unused, and GET, HEAD and OPTIONS suffice for allowed_methods."
+  description = "CloudFront ordered cache behaviors to attach, in order; origin_request_policy_id and function_arn are null when unused, rewrite is true exactly when function_arn is set (known at plan time, unlike function_arn), and GET, HEAD and OPTIONS suffice for allowed_methods."
   value       = local.behaviors
 }
