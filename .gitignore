@@ -10,3 +10,4 @@ node_modules/
 .DS_Store
 .claude/
 build/web/src/generated/
+modules/*/dist/*.zip

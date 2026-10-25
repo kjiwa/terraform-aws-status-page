@@ -1,4 +1,17 @@
 repos:
+  - repo: https://github.com/antonbabenko/pre-commit-terraform
+    rev: v1.109.1
+    hooks:
+      - id: terraform_fmt
+      - id: terraform_validate
+        # Parallel `terraform init` races on TF_PLUGIN_CACHE_DIR in CI
+        # (hashicorp/terraform#31964).
+        args:
+          - --hook-config=--parallelism-limit=1
+      - id: terraform_tflint
+        args:
+          - --args=--config=__GIT_WORKING_DIR__/.tflint.hcl
+
   - repo: https://github.com/shellcheck-py/shellcheck-py
     rev: v0.11.0.1
     hooks:

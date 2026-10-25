@@ -9,6 +9,14 @@ updates:
       actions:
         patterns: ["*"]
 
+  - package-ecosystem: terraform
+    directory: /modules/availability
+    schedule:
+      interval: weekly
+    groups:
+      providers:
+        patterns: ["*"]
+
   - package-ecosystem: pre-commit
     directory: /
     schedule:
