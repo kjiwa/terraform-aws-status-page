@@ -103,6 +103,7 @@ locals {
     cache_policy_id          = local.cache_policy_caching_optimized
     origin_request_policy_id = null
     function_arn             = null
+    rewrite                  = false
   }
 
   lambda_behavior = {
@@ -110,12 +111,13 @@ locals {
     cache_policy_id          = local.cache_policy_caching_disabled
     origin_request_policy_id = aws_cloudfront_origin_request_policy.status.id
     function_arn             = null
+    rewrite                  = false
   }
 
   behaviors = concat(
     [
-      merge(local.shell_behavior, { path_pattern = var.path_prefix, function_arn = aws_cloudfront_function.status_rewrite.arn }),
-      merge(local.shell_behavior, { path_pattern = "${var.path_prefix}/", function_arn = aws_cloudfront_function.status_rewrite.arn }),
+      merge(local.shell_behavior, { path_pattern = var.path_prefix, function_arn = aws_cloudfront_function.status_rewrite.arn, rewrite = true }),
+      merge(local.shell_behavior, { path_pattern = "${var.path_prefix}/", function_arn = aws_cloudfront_function.status_rewrite.arn, rewrite = true }),
       merge(local.shell_behavior, { path_pattern = "${var.path_prefix}/config.js" }),
       merge(local.lambda_behavior, { path_pattern = "${var.path_prefix}/data" }),
       merge(local.lambda_behavior, { path_pattern = "${var.path_prefix}/series" }),

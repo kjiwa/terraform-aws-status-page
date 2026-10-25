@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.1.1
+
+### Added
+
+- `modules/status`: `behaviors[].rewrite` and `origins[].custom_origin` flags, known at plan time, so a consumer attaches the rewrite function and the Lambda origin's custom origin config without comparing apply-time values.
+
 ## v0.1.0
 
 ### Added

@@ -66,6 +66,20 @@ run "names_derive_from_prefix" {
   }
 }
 
+run "rewrite_flag_marks_function_behaviors" {
+  command = plan
+
+  assert {
+    condition     = [for b in output.behaviors : b.path_pattern if b.rewrite] == ["/status", "/status/"]
+    error_message = "Only the two shell paths carry the rewrite function."
+  }
+
+  assert {
+    condition     = [for o in output.origins : o.origin_id if o.custom_origin] == ["status-lambda"]
+    error_message = "Only the Lambda origin is a custom origin."
+  }
+}
+
 run "behaviors_without_public" {
   command = plan
 
