@@ -1,0 +1,38 @@
+name: python
+
+on:
+  pull_request:
+    paths:
+      - 'modules/*/lambda/**'
+      - 'build/web/tests/fixtures/**'
+      - 'requirements-dev.txt'
+      - 'pyproject.toml'
+  push:
+    branches: [main]
+    paths:
+      - 'modules/*/lambda/**'
+      - 'build/web/tests/fixtures/**'
+      - 'requirements-dev.txt'
+      - 'pyproject.toml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: python-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          # Matches the Lambdas' declared runtime.
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+      - run: pip install -r requirements-dev.txt
+      - run: pytest
