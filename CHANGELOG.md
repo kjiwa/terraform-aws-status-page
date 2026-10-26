@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.1.2
+
+### Changed
+
+- `modules/status`: `bedrock.max_requests`, `max_tokens` and `max_context_length` are optional; the panel shows a dash for an omitted limit.
+
 ## v0.1.1
 
 ### Added

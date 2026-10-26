@@ -189,3 +189,19 @@ run "plugin_dir_requires_plugin" {
 
   expect_failures = [var.plugin_dir]
 }
+
+run "bedrock_limits_are_optional" {
+  command = plan
+
+  variables {
+    bedrock = {
+      region   = "us-west-2"
+      model_id = "example-model"
+    }
+  }
+
+  assert {
+    condition     = aws_lambda_function.status.environment[0].variables["BEDROCK_MAX_TOKENS"] == ""
+    error_message = "An omitted Bedrock limit must reach the Lambda as an empty string."
+  }
+}

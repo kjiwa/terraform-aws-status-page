@@ -142,9 +142,9 @@ variable "bedrock" {
   type = object({
     region             = string
     model_id           = string
-    max_requests       = number
-    max_tokens         = number
-    max_context_length = number
+    max_requests       = optional(number)
+    max_tokens         = optional(number)
+    max_context_length = optional(number)
   })
   default = null
 }
