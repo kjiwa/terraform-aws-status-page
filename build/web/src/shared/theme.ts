@@ -1,10 +1,13 @@
-import type { ThemeChoice } from '../status/config';
+import { TOKEN_NAMES, type ThemeChoice, type TokenName } from '../status/config';
 
 /**
  * Applies a config theme() result to the document. A null scheme leaves
  * status.css's prefers-color-scheme rules in charge; a null primary leaves
  * the stylesheet's accent. Approximate by design: the primary is used
- * directly as the accent rather than expanded into a tonal scheme.
+ * directly as the accent rather than expanded into a tonal scheme. tokens
+ * overrides individual --sp-* colors and is applied after primary, so an
+ * explicit tokens.secondary wins; it is not scheme-aware, so a consumer
+ * supplies the set that matches the scheme it returns.
  */
 
 /** White vs near-black text over a solid color, by luminance. */
@@ -24,6 +27,16 @@ function parseHex(hex: string): [number, number, number] | null {
   return [parseInt(c.slice(0, 2), 16), parseInt(c.slice(2, 4), 16), parseInt(c.slice(4, 6), 16)];
 }
 
+function validTokens(raw: unknown): ThemeChoice['tokens'] {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const out: Partial<Record<TokenName, string>> = {};
+  for (const name of TOKEN_NAMES) {
+    const v = (raw as Record<string, unknown>)[name];
+    if (typeof v === 'string' && CSS.supports('color', v)) out[name] = v;
+  }
+  return Object.keys(out).length > 0 ? out : null;
+}
+
 /** theme() is consumer code: a throw or a malformed result falls back to the defaults. */
 export function safeTheme(theme: () => ThemeChoice): ThemeChoice {
   try {
@@ -31,9 +44,10 @@ export function safeTheme(theme: () => ThemeChoice): ThemeChoice {
     return {
       scheme: t.scheme === 'light' || t.scheme === 'dark' ? t.scheme : null,
       primary: typeof t.primary === 'string' && parseHex(t.primary) ? t.primary : null,
+      tokens: validTokens(t.tokens),
     };
   } catch {
-    return { scheme: null, primary: null };
+    return { scheme: null, primary: null, tokens: null };
   }
 }
 
@@ -42,5 +56,8 @@ export function applyTheme(root: HTMLElement, choice: ThemeChoice): void {
   if (choice.primary) {
     root.style.setProperty('--sp-secondary', choice.primary);
     root.style.setProperty('--sp-on-secondary', onColor(choice.primary));
+  }
+  for (const [name, value] of Object.entries(choice.tokens ?? {})) {
+    root.style.setProperty(`--sp-${name}`, value);
   }
 }

@@ -1,8 +1,30 @@
 export type Scheme = 'light' | 'dark';
 
+export const TOKEN_NAMES = [
+  'surface',
+  'card',
+  'on-surface',
+  'muted',
+  'border',
+  'secondary',
+  'on-secondary',
+  'good',
+  'warn',
+  'bad',
+  'gray',
+  'chart-1',
+  'chart-2',
+  'chart-3',
+  'chart-2-tint',
+  'chart-track',
+] as const;
+
+export type TokenName = (typeof TOKEN_NAMES)[number];
+
 export interface ThemeChoice {
   scheme: Scheme | null;
   primary: string | null;
+  tokens?: Partial<Record<TokenName, string>> | null;
 }
 
 export interface StatusConfig {
@@ -93,7 +115,7 @@ function normalize(raw: Raw): StatusConfig {
     theme:
       typeof raw.theme === 'function'
         ? (raw.theme as () => ThemeChoice)
-        : () => ({ scheme: null, primary: null }),
+        : () => ({ scheme: null, primary: null, tokens: null }),
   };
 }
 
