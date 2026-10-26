@@ -67,9 +67,9 @@ locals {
     BEDROCK_ENABLED                = tostring(var.bedrock != null)
     BEDROCK_REGION                 = local.bedrock.region
     BEDROCK_MODEL_ID               = local.bedrock.model_id
-    BEDROCK_MAX_REQUESTS           = var.bedrock == null ? "" : tostring(local.bedrock.max_requests)
-    BEDROCK_MAX_TOKENS             = var.bedrock == null ? "" : tostring(local.bedrock.max_tokens)
-    BEDROCK_MAX_CONTEXT_LENGTH     = var.bedrock == null ? "" : tostring(local.bedrock.max_context_length)
+    BEDROCK_MAX_REQUESTS           = var.bedrock == null ? "" : local.bedrock.max_requests == null ? "" : tostring(local.bedrock.max_requests)
+    BEDROCK_MAX_TOKENS             = var.bedrock == null ? "" : local.bedrock.max_tokens == null ? "" : tostring(local.bedrock.max_tokens)
+    BEDROCK_MAX_CONTEXT_LENGTH     = var.bedrock == null ? "" : local.bedrock.max_context_length == null ? "" : tostring(local.bedrock.max_context_length)
     EPISODES_LOG_GROUP             = var.episodes_log_group
     EPISODES_LOG_STREAM            = local.episodes_log_stream
     CHANGES_LOG_STREAM             = local.changes_log_stream

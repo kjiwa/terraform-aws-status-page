@@ -113,7 +113,7 @@ export function Bedrock({
             pairs={[
               ['ID', d.model_id],
               ['Region', d.region],
-              ['Max requests', d.max_requests],
+              ['Max requests', numOrDash(d.max_requests)],
               ['Max tokens/run', numOrDash(d.max_tokens)],
               ['Max context', numOrDash(d.max_context_length)],
             ]}
