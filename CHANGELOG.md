@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.2.0
+
+### Added
+
+- `config.js` `theme()` may return `tokens`, an object of color overrides keyed by `surface`, `card`, `on-surface`, `muted`, `border`, `secondary`, `on-secondary`, `good`, `warn`, `bad`, `gray`, `chart-1`, `chart-2`, `chart-3`, `chart-2-tint` and `chart-track`. Unknown keys and values `CSS.supports('color', v)` rejects are dropped. Tokens apply after `primary`, so `tokens.secondary` wins. A consumer returns the set that matches the `scheme` it returns.
+
+### Changed
+
+- `theme()` results gain a `tokens` field (`null` when absent). A consumer that returns only `scheme` and `primary` is unaffected.
+
 ## v0.1.2
 
 ### Changed

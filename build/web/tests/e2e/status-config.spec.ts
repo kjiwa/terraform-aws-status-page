@@ -4,7 +4,7 @@
  */
 import { appSectionsPayload } from '../support/payload.ts';
 import { expectedCards, expectedSections } from '../support/expected.ts';
-import { ALL_TOGGLES_ON, AUTH_HEADER } from '../support/shell.ts';
+import { ALL_TOGGLES_ON, AUTH_HEADER, THEME_KEY } from '../support/shell.ts';
 import { expect, test } from './fixtures.ts';
 
 const SIGNED_IN = { access: 'e2e-access-token' };
@@ -206,6 +206,40 @@ test.describe('facts panel', () => {
     await page.goto(`${baseURL}/status`);
     await expect(page.locator('#panels .card > h3').first()).toBeVisible();
     await expect(page.locator('.section-head', { hasText: 'Application' })).toHaveCount(0);
+  });
+});
+
+test.describe('theme tokens', () => {
+  test('valid tokens restyle the page and invalid ones are ignored', async ({
+    page,
+    startStatus,
+  }) => {
+    const tokens = { surface: '#303e4a', card: '#28333d', bad: 'not-a-color', bogus: '#ffffff' };
+    const baseURL = await startStatus({
+      server: { toggles: ALL_TOGGLES_ON },
+      tokens: SIGNED_IN,
+      localStorage: { [THEME_KEY]: JSON.stringify({ scheme: 'dark', tokens }) },
+    });
+    await page.goto(`${baseURL}/status`);
+    await expect(page.locator('#panels .card > h3').first()).toBeVisible();
+
+    const style = await page.evaluate(() => {
+      const s = document.documentElement.style;
+      return {
+        surface: s.getPropertyValue('--sp-surface'),
+        card: s.getPropertyValue('--sp-card'),
+        bad: s.getPropertyValue('--sp-bad'),
+        bogus: s.getPropertyValue('--sp-bogus'),
+        cardBackground: getComputedStyle(document.querySelector('.card')!).backgroundColor,
+      };
+    });
+    expect(style).toEqual({
+      surface: '#303e4a',
+      card: '#28333d',
+      bad: '',
+      bogus: '',
+      cardBackground: 'rgb(40, 51, 61)',
+    });
   });
 });
 
