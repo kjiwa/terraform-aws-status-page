@@ -24,7 +24,7 @@ export type TokenName = (typeof TOKEN_NAMES)[number];
 export interface ThemeChoice {
   scheme: Scheme | null;
   primary: string | null;
-  tokens: Partial<Record<TokenName, string>> | null;
+  tokens?: Partial<Record<TokenName, string>> | null;
 }
 
 export interface StatusConfig {
