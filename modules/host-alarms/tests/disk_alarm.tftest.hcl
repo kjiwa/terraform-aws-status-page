@@ -180,10 +180,7 @@ run "root_alarm_needs_volume_metrics" {
     root_disk_alarm_enabled = true
   }
 
-  assert {
-    condition     = length(aws_cloudwatch_metric_alarm.disk_root_used) == 0
-    error_message = "Root alarm requires volume metrics"
-  }
+  expect_failures = [var.root_disk_alarm_enabled]
 }
 
 run "alarm_names_output" {

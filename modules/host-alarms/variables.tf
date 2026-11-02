@@ -9,7 +9,7 @@ variable "metric_namespace" {
 }
 
 variable "alarm_topic_arn" {
-  description = "SNS topic that receives backup failures and disk alarm transitions, normally modules/availability's sns_topic_arn."
+  description = "SNS topic that receives backup failures and disk alarm transitions, normally modules/availability's sns_topic_arn. Its policy must allow events.amazonaws.com to publish, or backup failure events are dropped without an error."
   type        = string
 }
 
@@ -41,9 +41,14 @@ variable "volume_metrics_enabled" {
 }
 
 variable "root_disk_alarm_enabled" {
-  description = "Whether to add a second alarm on the Mount=root series. Effective only with volume_metrics_enabled; DiskUsedPercent has no per-mount series."
+  description = "Whether to add a second alarm on the Mount=root series. Requires volume_metrics_enabled; DiskUsedPercent has no per-mount series."
   type        = bool
   default     = false
+
+  validation {
+    condition     = !var.root_disk_alarm_enabled || var.volume_metrics_enabled
+    error_message = "The root disk alarm reads the Mount=root byte series, so root_disk_alarm_enabled requires volume_metrics_enabled."
+  }
 }
 
 variable "disk_alarm_used_percent" {
