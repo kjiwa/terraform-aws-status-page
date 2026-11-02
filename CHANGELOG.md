@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.3.0
+
+### Added
+
+- `modules/host-alarms`: AWS Backup failure alert, data-volume disk alarm, availability dashboard and saved Logs Insights queries, named from `name_prefix` and reading `metric_namespace`. The disk alarm notifies on alarm and on OK, reads either `DiskUsedPercent` or, with `volume_metrics_enabled`, the `DiskUsedBytes`/`DiskTotalBytes` pair for `Mount=data`, and takes `disk_alarm_used_percent` and `disk_alarm_period_seconds`. `root_disk_alarm_enabled` adds a second alarm on `Mount=root` when volume metrics are on. The `alarm_names` output feeds `modules/availability`'s `alarm_publishers` without a dependency cycle.
+
+### Changed
+
+- Build tooling: `minimatch` is overridden to 11.0.1 (GHSA-g3hv-75wg-m249, dev scope) and `preact` and the other npm group dependencies are bumped; `modules/status/dist` is rebuilt.
+
+### Upgrade
+
+- A consumer adopting `modules/host-alarms` moves its backup-failure rule and target, `disk_used` alarm, dashboard and three query definitions with `moved` blocks; resource labels match.
+
 ## v0.2.0
 
 ### Added
