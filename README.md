@@ -9,6 +9,7 @@ Status: scaffold. Modules are added release by release; see CHANGELOG.md.
 | Module | Purpose |
 |---|---|
 | `modules/availability` | Probe, episode and change recorder, alarms, Spot interruption capture |
+| `modules/host-alarms` | Backup-failure alert, disk alarms, availability dashboard and saved queries |
 | `modules/status` | Lambda JSON API, S3-hosted single-file shell, origin and behavior specs |
 
 ## Usage
