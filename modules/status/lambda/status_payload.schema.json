@@ -527,6 +527,7 @@
           "type": "boolean"
         },
         "capacity_wait_s": {
+          "description": "Seconds from the moment capacity was needed to the replacement launch: the Spot interruption warning for a spot-reclaim, the outage start otherwise.",
           "type": [
             "integer",
             "null"

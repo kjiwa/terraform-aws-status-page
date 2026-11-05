@@ -22,6 +22,7 @@ import {
 import { cellOf, gridFor, RANGE_ORDER } from '../../src/status/ranges.ts';
 import {
   hasSpotActivity,
+  isSpotEpisode,
   median,
   percentile,
   poolTable,
@@ -29,6 +30,8 @@ import {
   summarize,
   type SpotData,
 } from '../../src/status/spot.ts';
+import { payloadFor } from '../support/payload.ts';
+import { ALL_TOGGLES_ON } from '../support/shell.ts';
 
 const NOW = Date.parse('2026-06-17T12:00:00Z'); // a Wednesday
 const DAY = 86400_000;
@@ -162,23 +165,94 @@ describe('hasSpotActivity', () => {
 });
 
 describe('recoverySplit', () => {
-  const timed = (wait: number, boot: number) =>
-    reclaim(NOW, { capacity_wait_s: wait, boot_to_serve_s: boot });
+  const instance = (launched: string, time?: string) => ({
+    id: 'i-x',
+    type: 'm8g.medium',
+    az: 'us-east-1b',
+    arch: 'arm64',
+    launched,
+    ...(time ? { time } : {}),
+  });
+  const timed = (warningS: number, launchS: number, endS: number, extra: Partial<Episode> = {}) =>
+    reclaim(NOW + 30_000, {
+      ended: iso(NOW + endS * 1000),
+      old_instance: instance('2026-06-17T00:00:00Z', iso(NOW + warningS * 1000)),
+      new_instance: instance(iso(NOW + launchS * 1000)),
+      ...extra,
+    });
+  // 2026-11-04 reclaim: warning 15:44:33, replacement launched 15:44:51, serving 15:47:00.
+  const real = reclaim(Date.parse('2026-11-04T15:44:50Z'), {
+    duration_s: 130,
+    ended: '2026-11-04T15:47:00Z',
+    old_instance: instance('2026-11-04T09:00:00Z', '2026-11-04T15:44:33Z'),
+    new_instance: instance('2026-11-04T15:44:51Z'),
+  });
 
   it('withholds the bar below three timed outages and reports how many carry timing', () => {
-    const r = recoverySplit([timed(60, 30), timed(90, 30), reclaim(NOW)]);
+    const r = recoverySplit([timed(0, 50, 300), timed(0, 50, 300), reclaim(NOW)]);
     expect(r).toEqual({ timed: 2, split: null });
   });
 
-  it('takes medians over the outages that carry both fields', () => {
-    const r = recoverySplit([timed(60, 30), timed(90, 40), timed(120, 50), reclaim(NOW)]);
-    expect(r.timed).toBe(3);
-    expect(r.split).toEqual({ count: 3, capacityWaitS: 90, bootToServeS: 40 });
+  it('treats an unparseable timestamp as untimed rather than averaging NaN', () => {
+    const bad = { ...real, new_instance: instance('not-a-time') };
+    expect(recoverySplit([bad, bad, bad])).toEqual({ timed: 0, split: null });
   });
 
-  it('skips an outage with only one of the two fields or null timings', () => {
-    const half = reclaim(NOW, { capacity_wait_s: 60, boot_to_serve_s: null });
-    expect(recoverySplit([half, half, half]).timed).toBe(0);
+  it('times a real reclaim from the warning to launch, then launch to serving', () => {
+    const r = recoverySplit([real, real, real]);
+    expect(r.split).toEqual({ count: 3, warningToLaunchS: 18, launchToServeS: 129 });
+  });
+
+  it('takes medians over the outages that carry a warning and a launch', () => {
+    const r = recoverySplit([
+      timed(0, 60, 100),
+      timed(0, 90, 130),
+      timed(0, 120, 170),
+      reclaim(NOW),
+    ]);
+    expect(r.timed).toBe(3);
+    expect(r.split).toEqual({ count: 3, warningToLaunchS: 90, launchToServeS: 40 });
+  });
+
+  it('falls back to started plus duration when the outage has no ended', () => {
+    const noEnd = (ep: Episode) => ({ ...ep, ended: undefined });
+    const r = recoverySplit([noEnd(real), noEnd(real), noEnd(real)]);
+    expect(r.split).toEqual({ count: 3, warningToLaunchS: 18, launchToServeS: 129 });
+  });
+
+  it('clamps a launch before the warning to zero', () => {
+    const r = recoverySplit([timed(100, 40, 160), timed(100, 40, 160), timed(100, 40, 160)]);
+    expect(r.split).toEqual({ count: 3, warningToLaunchS: 0, launchToServeS: 120 });
+  });
+
+  it('leaves an outage without a warning time untimed', () => {
+    const blind = reclaim(NOW, {
+      ended: iso(NOW + 300_000),
+      old_instance: instance('2026-06-17T00:00:00Z'),
+      new_instance: instance(iso(NOW + 50_000)),
+    });
+    expect(recoverySplit([blind, blind, blind])).toEqual({ timed: 0, split: null });
+  });
+
+  it('ignores the stored capacity_wait_s and boot_to_serve_s', () => {
+    const stale = { capacity_wait_s: 0, boot_to_serve_s: 999 };
+    const r = recoverySplit([real, real, real].map((ep) => ({ ...ep, ...stale })));
+    expect(r.split).toEqual({ count: 3, warningToLaunchS: 18, launchToServeS: 129 });
+  });
+
+  it('reads no 0s wait from fixture outages whose launch follows the warning', () => {
+    const fixture = payloadFor(ALL_TOGGLES_ON).incidents;
+    const eps = (Array.isArray(fixture) ? fixture : []).filter(isSpotEpisode);
+    const after = eps.filter(
+      (ep) =>
+        ep.old_instance?.time &&
+        ep.new_instance &&
+        Date.parse(ep.new_instance.launched) > Date.parse(ep.old_instance.time),
+    );
+    expect(after.length).toBeGreaterThan(0);
+    after.forEach((ep) => {
+      expect(recoverySplit([ep, ep, ep]).split?.warningToLaunchS).toBeGreaterThan(0);
+    });
   });
 });
 

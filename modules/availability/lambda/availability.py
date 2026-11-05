@@ -61,7 +61,8 @@ PULLED_ATTRIBUTION_WINDOW_S before the outage start and its end.
 Every episode carries a `planned` boolean (see PLANNED_CAUSES), which the
 status page reads to compute an uptime series that excludes planned
 maintenance, plus capacity_wait_s, boot_to_serve_s, lifecycle, and spot_price
-describing how the replacement instance came up.
+describing how the replacement instance came up. capacity_wait_s is timed from
+the interruption warning for a spot-reclaim and from the outage start otherwise.
 """
 
 import datetime
@@ -403,7 +404,8 @@ def handle_recovered(detail):
     old = state.pop("last_interruption", None) if cause == "spot-reclaim" else None
 
     new = current_asg_instance()
-    facts = launch_facts(new, started, ended)
+    needed_at = parse_ts(old["time"]) if old and old.get("time") else started
+    facts = launch_facts(new, needed_at, ended)
     activity = last_scaling_activity()
 
     lines = [
@@ -418,11 +420,10 @@ def handle_recovered(detail):
         lines.append(
             f"Now serving: {new['id']} ({new['type']}, {new['az']}, {new['arch']}), launched {new['launched']}."
         )
-        wait_s = facts["capacity_wait_s"]
-        if cause == "spot-reclaim" and wait_s > 0:
-            # Splits "waiting for Spot capacity" from "boot + deploy" time.
+        if cause == "spot-reclaim":
             lines.append(
-                f"Capacity wait ~{fmt_duration(wait_s)}; boot + deploy ~{fmt_duration(duration_s - wait_s)}."
+                f"Warning to launch ~{fmt_duration(facts['capacity_wait_s'])}; "
+                f"launch to serving ~{fmt_duration(facts['boot_to_serve_s'])}."
             )
     if activity:
         lines.append(f"Last ASG activity: {activity}")
@@ -686,10 +687,10 @@ def describe_instance(instance_id):
     }
 
 
-def launch_facts(new, started, ended):
-    """How the replacement came up: the wait for capacity (outage start to
-    launch), the boot-to-serve time (launch to recovery), and what it ran on.
-    All None when no instance is in service.
+def launch_facts(new, needed_at, ended):
+    """How the replacement came up: the wait for capacity (the moment it was
+    needed to launch), the boot-to-serve time (launch to recovery), and what it
+    ran on. All None when no instance is in service.
     """
     if not new:
         return {
@@ -700,7 +701,7 @@ def launch_facts(new, started, ended):
         }
     launched = parse_ts(new["launched"])
     return {
-        "capacity_wait_s": max(0, int((launched - started).total_seconds())),
+        "capacity_wait_s": max(0, int((launched - needed_at).total_seconds())),
         "boot_to_serve_s": max(0, int((ended - launched).total_seconds())),
         "lifecycle": new["lifecycle"],
         "spot_price": spot_price_at(new) if new["lifecycle"] == "spot" else None,

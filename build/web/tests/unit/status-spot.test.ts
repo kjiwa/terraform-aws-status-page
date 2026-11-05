@@ -188,21 +188,20 @@ describe('Spot subsection contents', () => {
       ep.cause === 'spot-reclaim' && Date.parse(ep.started ?? '') >= NOW - 30 * DAY;
     const spot = Array.isArray(data.incidents) ? data.incidents.filter(inWindow) : [];
     spot.slice(2).forEach((ep) => {
-      delete ep.capacity_wait_s;
-      delete ep.boot_to_serve_s;
+      delete ep.old_instance?.time;
     });
     const m = await mountOperator(data);
     const incidents = card(m, 'Incidents');
     expect(incidents?.querySelector('.split-bar')).toBeNull();
     expect(headings(incidents)).toEqual(['Spot reclaims', 'Recovery split']);
     expect(incidents?.textContent).toContain(
-      `Recovery timing recorded for 2 of ${spot.length} outages; the split appears at 3.`,
+      `Warning and launch times recorded for 2 of ${spot.length} outages; the split appears at 3.`,
     );
     expect(incidents?.textContent).not.toContain('Absorbed');
 
     const publicCard = card(await mountPublic(data), 'Incidents');
     expect(headings(publicCard)).toEqual(['Spot reclaims']);
-    expect(publicCard?.textContent).not.toContain('Recovery timing');
+    expect(publicCard?.textContent).not.toContain('Warning and launch times');
   });
 });
 

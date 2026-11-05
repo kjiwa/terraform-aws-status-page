@@ -2540,8 +2540,8 @@
       "duration_s": 150,
       "cause": "spot-reclaim",
       "planned": false,
-      "capacity_wait_s": 53,
-      "boot_to_serve_s": 97,
+      "capacity_wait_s": 18,
+      "boot_to_serve_s": 222,
       "lifecycle": "spot",
       "spot_price": 0.0163,
       "old_instance": {
@@ -2557,7 +2557,7 @@
         "type": "m8g.medium",
         "az": "us-east-1b",
         "arch": "arm64",
-        "launched": "2026-06-13T21:38:30Z"
+        "launched": "2026-06-13T21:34:48Z"
       }
     },
     {
@@ -2566,8 +2566,8 @@
       "duration_s": 247,
       "cause": "spot-reclaim",
       "planned": false,
-      "capacity_wait_s": 99,
-      "boot_to_serve_s": 148,
+      "capacity_wait_s": 31,
+      "boot_to_serve_s": 306,
       "lifecycle": "spot",
       "spot_price": 0.0163,
       "old_instance": {
@@ -2583,7 +2583,7 @@
         "type": "m8g.medium",
         "az": "us-east-1b",
         "arch": "arm64",
-        "launched": "2026-06-11T04:52:07Z"
+        "launched": "2026-06-11T04:47:01Z"
       }
     },
     {
@@ -2592,8 +2592,8 @@
       "duration_s": 344,
       "cause": "spot-reclaim",
       "planned": false,
-      "capacity_wait_s": 155,
-      "boot_to_serve_s": 189,
+      "capacity_wait_s": 44,
+      "boot_to_serve_s": 390,
       "lifecycle": "spot",
       "spot_price": 0.0163,
       "old_instance": {
@@ -2609,7 +2609,7 @@
         "type": "m8g.medium",
         "az": "us-east-1c",
         "arch": "arm64",
-        "launched": "2026-06-06T09:41:44Z"
+        "launched": "2026-06-06T09:35:14Z"
       }
     },
     {
@@ -2618,8 +2618,8 @@
       "duration_s": 441,
       "cause": "spot-reclaim",
       "planned": false,
-      "capacity_wait_s": 221,
-      "boot_to_serve_s": 220,
+      "capacity_wait_s": 57,
+      "boot_to_serve_s": 474,
       "lifecycle": "spot",
       "spot_price": 0.0163,
       "old_instance": {
@@ -2635,7 +2635,7 @@
         "type": "m8g.medium",
         "az": "us-east-1b",
         "arch": "arm64",
-        "launched": "2026-06-03T16:55:21Z"
+        "launched": "2026-06-03T16:47:27Z"
       }
     },
     {
@@ -2644,8 +2644,8 @@
       "duration_s": 538,
       "cause": "spot-reclaim",
       "planned": false,
-      "capacity_wait_s": 188,
-      "boot_to_serve_s": 350,
+      "capacity_wait_s": 28,
+      "boot_to_serve_s": 600,
       "lifecycle": "spot",
       "spot_price": 0.0163,
       "old_instance": {
@@ -2661,7 +2661,7 @@
         "type": "m7g.medium",
         "az": "us-east-1a",
         "arch": "arm64",
-        "launched": "2026-05-30T07:20:58Z"
+        "launched": "2026-05-30T07:10:58Z"
       }
     },
     {
@@ -2678,7 +2678,7 @@
         "arch": "x86_64",
         "launched": "2026-05-25T12:15:46Z"
       },
-      "capacity_wait_s": 473,
+      "capacity_wait_s": 28,
       "boot_to_serve_s": 473,
       "lifecycle": "spot",
       "spot_price": 0.0163
@@ -2689,8 +2689,8 @@
       "duration_s": 215,
       "cause": "spot-reclaim",
       "planned": false,
-      "capacity_wait_s": 86,
-      "boot_to_serve_s": 129,
+      "capacity_wait_s": 41,
+      "boot_to_serve_s": 264,
       "lifecycle": "spot",
       "spot_price": 0.0163,
       "old_instance": {
@@ -2706,7 +2706,7 @@
         "type": "t4g.medium",
         "az": "us-east-1b",
         "arch": "arm64",
-        "launched": "2026-05-24T00:03:35Z"
+        "launched": "2026-05-23T23:59:11Z"
       }
     },
     {
@@ -2715,8 +2715,8 @@
       "duration_s": 312,
       "cause": "spot-reclaim",
       "planned": false,
-      "capacity_wait_s": 140,
-      "boot_to_serve_s": 172,
+      "capacity_wait_s": 54,
+      "boot_to_serve_s": 348,
       "lifecycle": "spot",
       "spot_price": 0.0163,
       "old_instance": {
@@ -2732,7 +2732,7 @@
         "type": "m8g.medium",
         "az": "us-east-1b",
         "arch": "arm64",
-        "launched": "2026-05-19T12:05:12Z"
+        "launched": "2026-05-19T11:59:24Z"
       }
     },
     {
@@ -2741,8 +2741,8 @@
       "duration_s": 409,
       "cause": "spot-reclaim",
       "planned": false,
-      "capacity_wait_s": 205,
-      "boot_to_serve_s": 204,
+      "capacity_wait_s": 25,
+      "boot_to_serve_s": 474,
       "lifecycle": "spot",
       "spot_price": 0.0163,
       "old_instance": {
@@ -2758,7 +2758,7 @@
         "type": "m8g.medium",
         "az": "us-east-1c",
         "arch": "arm64",
-        "launched": "2026-05-13T02:30:49Z"
+        "launched": "2026-05-13T02:22:55Z"
       }
     },
     {
@@ -2767,8 +2767,8 @@
       "duration_s": 506,
       "cause": "spot-reclaim",
       "planned": false,
-      "capacity_wait_s": 177,
-      "boot_to_serve_s": 329,
+      "capacity_wait_s": 38,
+      "boot_to_serve_s": 558,
       "lifecycle": "spot",
       "spot_price": 0.0163,
       "old_instance": {
@@ -2784,7 +2784,7 @@
         "type": "m7g.medium",
         "az": "us-east-1b",
         "arch": "arm64",
-        "launched": "2026-05-06T09:44:26Z"
+        "launched": "2026-05-06T09:35:08Z"
       }
     },
     {
@@ -2806,7 +2806,7 @@
         "type": "m8g.medium",
         "az": "us-east-1b",
         "arch": "arm64",
-        "launched": "2026-05-05T12:03:03Z"
+        "launched": "2026-05-05T11:59:21Z"
       }
     },
     {
@@ -2847,7 +2847,7 @@
         "type": "m6g.medium",
         "az": "us-east-1c",
         "arch": "arm64",
-        "launched": "2026-04-21T07:16:40Z"
+        "launched": "2026-04-21T07:10:52Z"
       }
     },
     {
@@ -2869,7 +2869,7 @@
         "type": "m8g.medium",
         "az": "us-east-1c",
         "arch": "arm64",
-        "launched": "2026-04-14T19:18:17Z"
+        "launched": "2026-04-14T19:11:05Z"
       }
     },
     {
@@ -2910,7 +2910,7 @@
         "type": "m8g.medium",
         "az": "us-east-1b",
         "arch": "arm64",
-        "launched": "2026-04-07T14:31:54Z"
+        "launched": "2026-04-07T14:23:18Z"
       }
     },
     {
@@ -2932,7 +2932,7 @@
         "type": "m7g.medium",
         "az": "us-east-1a",
         "arch": "arm64",
-        "launched": "2026-03-31T04:50:31Z"
+        "launched": "2026-03-31T04:46:49Z"
       }
     },
     {
@@ -2954,7 +2954,7 @@
         "type": "m6gd.medium-with-a-deliberately-long-name",
         "az": "us-east-1a",
         "arch": "arm64",
-        "launched": "2026-03-24T00:04:08Z"
+        "launched": "2026-03-23T23:59:02Z"
       }
     },
     {
@@ -2995,7 +2995,7 @@
         "type": "m8g.medium",
         "az": "us-east-1b",
         "arch": "arm64",
-        "launched": "2026-03-10T12:05:45Z"
+        "launched": "2026-03-10T11:59:15Z"
       }
     },
     {
@@ -3017,10 +3017,10 @@
         "type": "t3a.small",
         "az": "us-east-1a",
         "arch": "x86_64",
-        "launched": "2026-03-02T12:19:36Z"
+        "launched": "2026-03-02T11:59:58Z"
       },
-      "capacity_wait_s": 588,
-      "boot_to_serve_s": 588,
+      "capacity_wait_s": 58,
+      "boot_to_serve_s": 1178,
       "lifecycle": "spot",
       "spot_price": 0.0163
     },
@@ -3043,7 +3043,7 @@
         "type": "t4g.medium",
         "az": "us-east-1b",
         "arch": "arm64",
-        "launched": "2026-02-17T07:19:22Z"
+        "launched": "2026-02-17T07:10:59Z"
       }
     },
     {
@@ -3084,7 +3084,7 @@
         "type": "m8g.medium",
         "az": "us-east-1c",
         "arch": "arm64",
-        "launched": "2026-01-26T00:08:59Z"
+        "launched": "2026-01-25T23:59:12Z"
       }
     },
     {
@@ -3125,7 +3125,7 @@
         "type": "c7g.large",
         "az": "us-east-1d",
         "arch": "arm64",
-        "launched": "2026-01-02T14:27:36Z"
+        "launched": "2026-01-02T14:23:25Z"
       }
     },
     {
@@ -3185,7 +3185,7 @@
         "type": "m8g.medium",
         "az": "us-east-1b",
         "arch": "arm64",
-        "launched": "2025-11-21T21:41:13Z"
+        "launched": "2025-11-21T21:34:56Z"
       }
     },
     {
@@ -3207,7 +3207,7 @@
         "type": "m7g.medium",
         "az": "us-east-1a",
         "arch": "arm64",
-        "launched": "2025-10-07T04:54:50Z"
+        "launched": "2025-10-07T04:47:09Z"
       }
     },
     {

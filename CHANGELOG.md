@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.3.1
+
+### Fixed
+
+- The Spot recovery split times a reclaim from the interruption warning. Capacity wait read 0 whenever the drain launched the replacement before the first failed probe, and launch-to-serving exceeded the outage. The page derives both segments from `old_instance.time`, `new_instance.launched` and `ended`, so earlier episodes count without a backfill. The RECOVERED email prints the same two segments for every Spot reclaim.
+
+### Changed
+
+- `capacity_wait_s` on a spot-reclaim episode is measured from the interruption warning from this release; other causes still measure from the outage start. The page no longer reads the stored `capacity_wait_s` and `boot_to_serve_s`.
+
 ## v0.3.0
 
 ### Added
