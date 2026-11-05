@@ -423,6 +423,18 @@ class EpisodeFieldsReplay(ReplayCase):
         self.assertEqual(episode["capacity_wait_s"], 150)
         self.assertEqual(episode["boot_to_serve_s"], 150)
 
+    def test_spot_reclaim_times_the_wait_from_the_warning(self):
+        self.world.outage(300, 600, launched_s=290)
+        self.world.warn(240)
+        self.world.replay()
+        episode = self.assertEpisode("spot-reclaim", False)
+        self.assertEqual(episode["capacity_wait_s"], 50)
+        self.assertEqual(episode["boot_to_serve_s"], 310)
+        self.assertIn(
+            "Warning to launch ~50s; launch to serving ~5m 10s.",
+            self.world.emails[-1][1],
+        )
+
     def test_launch_before_start_clamps_wait_to_zero(self):
         self.world.outage(300, 600, launched_s=240)
         self.world.replay()

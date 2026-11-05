@@ -1,7 +1,7 @@
 import type { Episode, Interruption, PanelError } from '../generated/status-payload';
 import type { TimeWindow } from './ranges';
 
-/** Fewest outages carrying both timing fields before the recovery split draws a bar. */
+/** Fewest outages carrying both anchors before the recovery split draws a bar. */
 export const SPLIT_MIN_EPISODES = 3;
 export const POOL_ROWS = 6;
 
@@ -13,8 +13,8 @@ export interface SpotSummary {
 
 export interface RecoverySplit {
   count: number;
-  capacityWaitS: number;
-  bootToServeS: number;
+  warningToLaunchS: number;
+  launchToServeS: number;
 }
 
 export interface PoolRow {
@@ -93,22 +93,46 @@ export function summarize(data: SpotData, w: TimeWindow): SpotSummary {
   };
 }
 
-/** Medians over the outages that carry both timing fields; null below SPLIT_MIN_EPISODES. */
+function servedAtMs(ep: Episode): number {
+  return ep.ended ? Date.parse(ep.ended) : Date.parse(ep.started) + ep.duration_s * 1000;
+}
+
+interface Segments {
+  warningToLaunchS: number;
+  launchToServeS: number;
+}
+
+/** Warning to replacement launch, then launch to serving; null when the episode lacks either anchor. */
+function segmentsOf(ep: Episode): Segments | null {
+  const warning = ep.old_instance?.time;
+  const launched = ep.new_instance?.launched;
+  if (!warning || !launched) return null;
+  const warningMs = Date.parse(warning);
+  const launchMs = Date.parse(launched);
+  const servedMs = servedAtMs(ep);
+  if (![warningMs, launchMs, servedMs].every(Number.isFinite)) return null;
+  return {
+    warningToLaunchS: Math.max(0, (launchMs - warningMs) / 1000),
+    launchToServeS: Math.max(0, (servedMs - launchMs) / 1000),
+  };
+}
+
+/** Medians over the outages carrying a warning and a launch time; null below SPLIT_MIN_EPISODES. */
 export function recoverySplit(episodes: Episode[]): { timed: number; split: RecoverySplit | null } {
-  const waits: number[] = [];
-  const boots: number[] = [];
-  episodes.forEach((ep) => {
-    if (typeof ep.capacity_wait_s === 'number' && typeof ep.boot_to_serve_s === 'number') {
-      waits.push(ep.capacity_wait_s);
-      boots.push(ep.boot_to_serve_s);
-    }
-  });
-  const capacityWaitS = median(waits);
-  const bootToServeS = median(boots);
-  if (waits.length < SPLIT_MIN_EPISODES || capacityWaitS === null || bootToServeS === null) {
-    return { timed: waits.length, split: null };
+  const segments = episodes.map(segmentsOf).filter((x): x is Segments => x !== null);
+  const warningToLaunchS = median(segments.map((x) => x.warningToLaunchS));
+  const launchToServeS = median(segments.map((x) => x.launchToServeS));
+  if (
+    segments.length < SPLIT_MIN_EPISODES ||
+    warningToLaunchS === null ||
+    launchToServeS === null
+  ) {
+    return { timed: segments.length, split: null };
   }
-  return { timed: waits.length, split: { count: waits.length, capacityWaitS, bootToServeS } };
+  return {
+    timed: segments.length,
+    split: { count: segments.length, warningToLaunchS, launchToServeS },
+  };
 }
 
 function lifetimeS(ep: Episode): number | null {

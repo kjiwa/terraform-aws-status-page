@@ -108,11 +108,11 @@ function instanceCell(ep: Episode) {
 }
 
 function SplitBar({ split }: { split: RecoverySplit }) {
-  const total = split.capacityWaitS + split.bootToServeS;
-  const capacity = total > 0 ? split.capacityWaitS / total : 0.5;
+  const total = split.warningToLaunchS + split.launchToServeS;
+  const capacity = total > 0 ? split.warningToLaunchS / total : 0.5;
   const pct = (f: number) => `${Math.round(f * 100)}%`;
-  const capacityText = `Capacity wait ${fmtDuration(split.capacityWaitS)} (${pct(capacity)})`;
-  const bootText = `Boot to serve ${fmtDuration(split.bootToServeS)} (${pct(1 - capacity)})`;
+  const capacityText = `Warning to launch ${fmtDuration(split.warningToLaunchS)} (${pct(capacity)})`;
+  const bootText = `Launch to serving ${fmtDuration(split.launchToServeS)} (${pct(1 - capacity)})`;
   return (
     <>
       <h4>Recovery split</h4>
@@ -124,7 +124,7 @@ function SplitBar({ split }: { split: RecoverySplit }) {
         <LegendPair cls="c-chart2" label={capacityText} />
         <LegendPair cls="c-chart2-tint" label={bootText} />
       </p>
-      <p class="note">{`Medians over ${split.count} outages with recovery timing.`}</p>
+      <p class="note">{`Medians over ${split.count} reclaims, timed from the interruption warning.`}</p>
     </>
   );
 }
@@ -134,7 +134,7 @@ function SplitPending({ timed, total }: { timed: number; total: number }) {
     <>
       <h4>Recovery split</h4>
       <p class="note">
-        {`Recovery timing recorded for ${timed} of ${total} outages; the split appears at ${SPLIT_MIN_EPISODES}.`}
+        {`Warning and launch times recorded for ${timed} of ${total} outages; the split appears at ${SPLIT_MIN_EPISODES}.`}
       </p>
     </>
   );
