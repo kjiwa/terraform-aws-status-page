@@ -83,3 +83,17 @@ run "backup_alert_filters_failed_and_expired" {
     error_message = "Backup alert states"
   }
 }
+
+run "episodes_queries_read_only_the_episodes_stream" {
+  command = plan
+
+  assert {
+    condition = alltrue([
+      strcontains(aws_cloudwatch_query_definition.downtime_by_cause.query_string, "filter @logStream = \"episodes\""),
+      strcontains(aws_cloudwatch_query_definition.episodes.query_string, "filter @logStream = \"episodes\""),
+      strcontains(aws_cloudwatch_dashboard.availability.dashboard_body, "Recent outage episodes"),
+      strcontains(aws_cloudwatch_dashboard.availability.dashboard_body, "filter @logStream = \\\"episodes\\\" | fields"),
+    ])
+    error_message = "Dashboard table and saved episodes queries must filter @logStream to the episodes stream"
+  }
+}
