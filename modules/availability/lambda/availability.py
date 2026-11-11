@@ -520,16 +520,20 @@ def load_marker(param_name):
     the module docstring): {"time": ..., "instance_id": ...}. Returns {} --
     same as attributed_by_marker's "nothing written yet" case -- both when the
     parameter holds its pre-write "{}" default and when it predates this
-    stack's Terraform apply entirely; a missing marker parameter must not
-    crash cause attribution. An empty name (marker not configured) is {}
+    stack's Terraform apply entirely; a missing or unreadable marker must
+    not crash cause attribution. An empty name (marker not configured) is {}
     without an SSM call.
     """
     if not param_name:
         return {}
-    try:
-        return json.loads(ssm.get_parameter(Name=param_name)["Parameter"]["Value"])
-    except ssm.exceptions.ParameterNotFound:
-        return {}
+
+    def read():
+        try:
+            return json.loads(ssm.get_parameter(Name=param_name)["Parameter"]["Value"])
+        except ssm.exceptions.ParameterNotFound:
+            return {}
+
+    return tolerant(f"load_marker {param_name}", read, {})
 
 
 def tolerant(name, lookup, default):
@@ -730,27 +734,29 @@ def spot_price_at(instance):
 
 
 def current_asg_instance():
-    r = autoscaling.describe_auto_scaling_groups(AutoScalingGroupNames=[ASG_NAME])
-    instances = r["AutoScalingGroups"][0]["Instances"]
-    if not instances:
-        return None
-    try:
-        return describe_instance(instances[0]["InstanceId"])
-    except (
-        Exception
-    ) as e:  # raced a terminating instance; email still useful without it
-        print(json.dumps({"describe_instance_failed": str(e)}))
-        return None
+    """The ASG's serving instance, or None; a raced terminating instance or a
+    failed lookup leaves the email useful without it.
+    """
+
+    def lookup():
+        r = autoscaling.describe_auto_scaling_groups(AutoScalingGroupNames=[ASG_NAME])
+        instances = r["AutoScalingGroups"][0]["Instances"]
+        return describe_instance(instances[0]["InstanceId"]) if instances else None
+
+    return tolerant("current_asg_instance", lookup, None)
 
 
 def last_scaling_activity():
-    r = autoscaling.describe_scaling_activities(
-        AutoScalingGroupName=ASG_NAME, MaxRecords=1
-    )
-    if not r["Activities"]:
-        return None
-    a = r["Activities"][0]
-    return f"{a['Description']} ({iso(a['StartTime'])})"
+    def lookup():
+        r = autoscaling.describe_scaling_activities(
+            AutoScalingGroupName=ASG_NAME, MaxRecords=1
+        )
+        if not r["Activities"]:
+            return None
+        a = r["Activities"][0]
+        return f"{a['Description']} ({iso(a['StartTime'])})"
+
+    return tolerant("last_scaling_activity", lookup, None)
 
 
 # --- state + helpers -------------------------------------------------------------

@@ -393,5 +393,72 @@ class OptionalIntegrationTests(unittest.TestCase):
             importlib.reload(availability)
 
 
+class DownPathDegradationTests(unittest.TestCase):
+    """A broken enrichment lookup must never cost the DOWN or RECOVERED email."""
+
+    STATE_PARAM = "/test/state"
+
+    class FakeSsm:
+        class exceptions:
+            class ParameterNotFound(Exception):
+                pass
+
+        def __init__(self, marker_value=None, marker_error=None):
+            self.marker_value = marker_value
+            self.marker_error = marker_error
+            self.puts = []
+
+        def get_parameter(self, Name):
+            if Name == "/test/state":
+                return {"Parameter": {"Value": self.state_value}}
+            if self.marker_error:
+                raise self.marker_error
+            return {"Parameter": {"Value": self.marker_value}}
+
+        def put_parameter(self, **kwargs):
+            self.puts.append(kwargs)
+
+        state_value = "{}"
+
+    def run_down(self, ssm):
+        sns = mock.Mock()
+        detail = {"state": {"timestamp": "2026-09-15T10:00:00Z"}}
+        with (
+            mock.patch.object(availability, "ssm", ssm),
+            mock.patch.object(availability, "sns", sns),
+            mock.patch.object(availability, "edge_metric_series", return_value=[]),
+            mock.patch.object(availability, "recent_deployment", return_value=False),
+            mock.patch.object(
+                availability, "recent_instance_refresh", return_value=False
+            ),
+            mock.patch.object(availability, "recent_scaling_cause", return_value=False),
+        ):
+            availability.handle_down(detail)
+        return sns
+
+    def test_marker_access_denied_still_sends_down_and_saves_state(self):
+        class AccessDenied(Exception):
+            pass
+
+        ssm = self.FakeSsm(marker_error=AccessDenied("not authorized"))
+        sns = self.run_down(ssm)
+        sns.publish.assert_called_once()
+        self.assertEqual(len(ssm.puts), 1)
+
+    def test_marker_non_json_still_sends_down_and_saves_state(self):
+        ssm = self.FakeSsm(marker_value="not json")
+        sns = self.run_down(ssm)
+        sns.publish.assert_called_once()
+        self.assertEqual(len(ssm.puts), 1)
+
+    def test_recovered_lookups_degrade_to_absent(self):
+        autoscaling = mock.Mock()
+        autoscaling.describe_auto_scaling_groups.side_effect = RuntimeError("throttled")
+        autoscaling.describe_scaling_activities.side_effect = RuntimeError("throttled")
+        with mock.patch.object(availability, "autoscaling", autoscaling):
+            self.assertIsNone(availability.current_asg_instance())
+            self.assertIsNone(availability.last_scaling_activity())
+
+
 if __name__ == "__main__":
     unittest.main()
