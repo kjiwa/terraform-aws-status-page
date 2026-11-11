@@ -1,5 +1,11 @@
 data "aws_region" "current" {}
 
+# The episodes stream of modules/availability; the log group also holds its
+# `changes` stream, which is not an outage record.
+locals {
+  episodes_stream_filter = "filter @logStream = \"episodes\""
+}
+
 # The "what is Spot costing me" view. Availability % is just AVG(SiteUp) over
 # whatever time range the dashboard is set to (default 30 days).
 
@@ -82,7 +88,7 @@ resource "aws_cloudwatch_dashboard" "availability" {
           title  = "Recent outage episodes"
           region = data.aws_region.current.region
           view   = "table"
-          query  = "SOURCE '${var.episodes_log_group_name}' | fields @timestamp, cause, duration_s, new_instance.type, new_instance.az | sort @timestamp desc | limit 20"
+          query  = "SOURCE '${var.episodes_log_group_name}' | ${local.episodes_stream_filter} | fields @timestamp, cause, duration_s, new_instance.type, new_instance.az | sort @timestamp desc | limit 20"
         }
       },
     ]
@@ -96,7 +102,8 @@ resource "aws_cloudwatch_query_definition" "downtime_by_cause" {
   name            = "${var.name_prefix}/downtime-by-cause"
   log_group_names = [var.episodes_log_group_name]
   query_string    = <<-EOT
-    fields cause, duration_s
+    ${local.episodes_stream_filter}
+    | fields cause, duration_s
     | stats count(*) as outages, sum(duration_s) / 60 as downtime_minutes, avg(duration_s) / 60 as avg_minutes, max(duration_s) / 60 as worst_minutes by cause
   EOT
 }
@@ -105,7 +112,8 @@ resource "aws_cloudwatch_query_definition" "episodes" {
   name            = "${var.name_prefix}/outage-episodes"
   log_group_names = [var.episodes_log_group_name]
   query_string    = <<-EOT
-    fields started, ended, duration_s, cause, old_instance.type, new_instance.type, new_instance.az
+    ${local.episodes_stream_filter}
+    | fields started, ended, duration_s, cause, old_instance.type, new_instance.type, new_instance.az
     | sort @timestamp desc
   EOT
 }

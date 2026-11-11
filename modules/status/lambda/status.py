@@ -2156,14 +2156,17 @@ def cost():
     today = datetime.datetime.now(datetime.UTC).date()
     start = today.replace(day=1)
     # GetCostAndUsage's End is exclusive; today itself is fine to exclude
-    # since it is (by definition) not yet billed in full.
-    r = ce.get_cost_and_usage(
-        TimePeriod={"Start": start.isoformat(), "End": today.isoformat()},
-        Granularity="MONTHLY",
-        Metrics=["UnblendedCost"],
-        GroupBy=[{"Type": "DIMENSION", "Key": "SERVICE"}],
-    )
-    groups = (r.get("ResultsByTime") or [{}])[0].get("Groups", [])
+    # since it is (by definition) not yet billed in full. On the 1st that
+    # leaves an empty period, which Cost Explorer rejects.
+    groups = []
+    if start < today:
+        r = ce.get_cost_and_usage(
+            TimePeriod={"Start": start.isoformat(), "End": today.isoformat()},
+            Granularity="MONTHLY",
+            Metrics=["UnblendedCost"],
+            GroupBy=[{"Type": "DIMENSION", "Key": "SERVICE"}],
+        )
+        groups = (r.get("ResultsByTime") or [{}])[0].get("Groups", [])
     breakdown = [
         {
             "service": g["Keys"][0],
