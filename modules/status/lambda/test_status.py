@@ -2957,3 +2957,23 @@ class SourceRepoTests(unittest.TestCase):
         ):
             resp = status.data_response({"x-token": "ok"}, FakeContext())
         self.assertIsNone(json.loads(resp["body"])["source_repo"])
+
+
+class CostFirstOfMonthTests(unittest.TestCase):
+    def test_first_of_month_skips_cost_explorer(self):
+        fixed_now = dt(2026, 11, 1, 0, 30, 0)
+
+        class FrozenDatetime(datetime.datetime):
+            @classmethod
+            def now(cls, tz=None):
+                return fixed_now if tz is None else fixed_now.astimezone(tz)
+
+        with (
+            mock.patch.object(status.datetime, "datetime", FrozenDatetime),
+            mock.patch.object(status, "ce") as ce,
+            mock.patch.dict(status._cost_cache, {"data": None, "fetched_at": 0.0}),
+        ):
+            result = status.cost()
+        ce.get_cost_and_usage.assert_not_called()
+        self.assertEqual(result["month_to_date_usd"], 0.0)
+        self.assertEqual(result["top_services"], [])
