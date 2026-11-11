@@ -451,6 +451,14 @@ class DownPathDegradationTests(unittest.TestCase):
         sns.publish.assert_called_once()
         self.assertEqual(len(ssm.puts), 1)
 
+    def test_marker_valid_json_without_a_usable_time_still_sends_down(self):
+        for value in ("5", '"abc"', "[1]", '{"time": "garbage"}', '{"time": 7}'):
+            with self.subTest(value=value):
+                ssm = self.FakeSsm(marker_value=value)
+                sns = self.run_down(ssm)
+                sns.publish.assert_called_once()
+                self.assertEqual(len(ssm.puts), 1)
+
     def test_recovered_lookups_degrade_to_absent(self):
         autoscaling = mock.Mock()
         autoscaling.describe_auto_scaling_groups.side_effect = RuntimeError("throttled")

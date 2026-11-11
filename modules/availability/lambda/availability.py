@@ -529,9 +529,16 @@ def load_marker(param_name):
 
     def read():
         try:
-            return json.loads(ssm.get_parameter(Name=param_name)["Parameter"]["Value"])
+            marker = json.loads(
+                ssm.get_parameter(Name=param_name)["Parameter"]["Value"]
+            )
         except ssm.exceptions.ParameterNotFound:
             return {}
+        if isinstance(marker, dict) and "time" in marker:
+            parse_ts(marker["time"])
+        elif marker:
+            raise ValueError(f"marker is not a dict with a time: {marker!r}")
+        return marker
 
     return tolerant(f"load_marker {param_name}", read, {})
 
