@@ -2,7 +2,7 @@
 
 Terraform modules and a static shell for a self-hosted status page on AWS: reliability, incidents, changes, Spot, host, storage, backups, cost, and a Bedrock usage panel. An app composes the core at runtime with its own authenticator and panels; the core never names the app.
 
-Status: scaffold. Modules are added release by release; see CHANGELOG.md.
+Status: released; see CHANGELOG.md for the release history.
 
 ## Modules
 

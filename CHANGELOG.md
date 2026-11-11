@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.3.2
+
+### Fixed
+
+- The cost panel no longer calls Cost Explorer on the 1st of the month, when the period would be empty and Cost Explorer rejects it; it reports a zero month-to-date until the 2nd.
+- `modules/availability` reads the cause markers through `tolerant()`. An unreadable or non-JSON marker no longer loses the DOWN email or misfiles the outage as a wake. The RECOVERED email's ASG instance and last-activity lookups degrade to absent the same way.
+- `modules/host-alarms`: the recent-episodes dashboard table and the `downtime-by-cause` and `outage-episodes` saved queries filter to the `episodes` stream, so change-log lines no longer count as outages.
+
 ## v0.3.1
 
 ### Fixed
