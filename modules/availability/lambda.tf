@@ -49,6 +49,7 @@ resource "aws_lambda_function" "availability" {
     variables = {
       SITE_URL                       = local.site_url
       CANARY_ENABLED                 = tostring(var.canary_enabled)
+      PLANNED_CAUSES                 = join(",", var.planned_causes)
       ASG_NAME                       = var.asg_name
       SNS_TOPIC_ARN                  = aws_sns_topic.alerts.arn
       STATE_PARAM                    = aws_ssm_parameter.state.name

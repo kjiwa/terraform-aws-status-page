@@ -55,6 +55,7 @@ if "botocore" not in sys.modules:
 for _var, _val in [
     ("SITE_URL", "https://example.invalid"),
     ("CANARY_ENABLED", "true"),
+    ("PLANNED_CAUSES", "rightsize,deploy,instance-refresh,capacity-change,backup"),
     ("NAME_PREFIX", "test-site"),
     ("ASG_NAME", "test-asg"),
     ("SNS_TOPIC_ARN", "arn:aws:sns:us-east-1:123456789012:test-topic"),
