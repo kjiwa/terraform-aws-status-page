@@ -393,7 +393,7 @@ class WakeReplay(ReplayCase):
         self.world.recover()
         self.assertEqual(self.world.episodes, [])
         self.assertEqual(len(self.world.emails), 1)
-        self.assertIn("woke", self.world.emails[0][0])
+        self.assertIn("no outage recorded", self.world.emails[0][0])
 
 
 class ClassifiedAtRecovery(ReplayCase):
