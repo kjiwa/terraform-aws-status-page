@@ -331,6 +331,35 @@ class FirstDownRecoveryTests(unittest.TestCase):
         fallback = dt(2026, 7, 15, 13, 0, 0)
         self.assertEqual(availability.recovery(series, fallback), fallback)
 
+    def test_a_gap_in_the_series_is_down(self):
+        # A heartbeat publisher that is down publishes nothing, so the outage
+        # is the missing minutes, not a run of zeros.
+        series = [
+            (dt(2026, 7, 15, 12, 0, 0), 1),
+            (dt(2026, 7, 15, 12, 10, 0), 1),
+        ]
+        fallback = dt(2026, 7, 15, 13, 0, 0)
+        self.assertEqual(
+            availability.first_down(series, fallback), dt(2026, 7, 15, 12, 1, 0)
+        )
+        self.assertEqual(
+            availability.recovery(series, fallback), dt(2026, 7, 15, 12, 10, 0)
+        )
+
+    def test_a_gap_followed_by_zeros_ends_at_the_first_pass(self):
+        series = [
+            (dt(2026, 7, 15, 12, 0, 0), 1),
+            (dt(2026, 7, 15, 12, 10, 0), 0),
+            (dt(2026, 7, 15, 12, 11, 0), 1),
+        ]
+        fallback = dt(2026, 7, 15, 13, 0, 0)
+        self.assertEqual(
+            availability.first_down(series, fallback), dt(2026, 7, 15, 12, 1, 0)
+        )
+        self.assertEqual(
+            availability.recovery(series, fallback), dt(2026, 7, 15, 12, 11, 0)
+        )
+
 
 class BotoConfigTests(unittest.TestCase):
     """Every module-level client carries the bounded-timeout config."""
@@ -467,6 +496,22 @@ class DownPathDegradationTests(unittest.TestCase):
         with mock.patch.object(availability, "autoscaling", autoscaling):
             self.assertIsNone(availability.current_asg_instance())
             self.assertIsNone(availability.last_scaling_activity())
+
+
+class UnrecordedRecoveryTests(unittest.TestCase):
+    def test_recovery_without_an_open_outage_does_not_claim_a_sleep(self):
+        detail = {
+            "state": {"value": "OK", "timestamp": "2026-07-15T12:10:00.000+0000"},
+            "previousState": {"value": "ALARM"},
+        }
+        with (
+            mock.patch.object(availability, "load_state", return_value={}),
+            mock.patch.object(availability, "notify") as notify,
+        ):
+            availability.handle_recovered(detail)
+        subject, body = notify.call_args.args
+        self.assertIn("no outage recorded", subject)
+        self.assertNotIn("slept.", body)
 
 
 class ScheduledEventTests(unittest.TestCase):

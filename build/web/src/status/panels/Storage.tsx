@@ -184,6 +184,8 @@ export function Storage({
   const dataVolume = d.volumes?.find((v) => v.role === 'data');
   const rootVolume = d.volumes?.find((v) => v.role === 'root');
   const hasObjectCount = d.bucket_object_count !== null && d.bucket_object_count !== undefined;
+  const hasMedia =
+    hasObjectCount || (d.bucket_size_bytes !== null && d.bucket_size_bytes !== undefined);
   // Percent-path meter only -- the byte path's own chart replaces it (see
   // showChart below). Full-width, below the subgrid, matching Cost's own
   // note+bar budget meter.
@@ -284,30 +286,34 @@ export function Storage({
   return (
     <Card title="Storage">
       <div class="subgrid">
-        <VolumeColumn
-          title="Data volume"
-          v={dataVolume}
-          used={byBytes ? usedRow(m, 'data') : null}
-        />
+        {dataVolume && (
+          <VolumeColumn
+            title="Data volume"
+            v={dataVolume}
+            used={byBytes ? usedRow(m, 'data') : null}
+          />
+        )}
         <VolumeColumn
           title="Root volume"
           v={rootVolume}
           used={byBytes ? usedRow(m, 'root') : null}
         />
-        <div>
-          <h4>Media</h4>
-          <Kv
-            pairs={[
-              ['Media size', fmtBytes(d.bucket_size_bytes)],
-              ['Media objects', hasObjectCount ? d.bucket_object_count : null],
-            ]}
-          />
-          {hasObjectCount && (
-            <p class="note">
-              Count includes non-current versions, which expire 90 days after replacement.
-            </p>
-          )}
-        </div>
+        {hasMedia && (
+          <div>
+            <h4>Media</h4>
+            <Kv
+              pairs={[
+                ['Media size', fmtBytes(d.bucket_size_bytes)],
+                ['Media objects', hasObjectCount ? d.bucket_object_count : null],
+              ]}
+            />
+            {hasObjectCount && (
+              <p class="note">
+                Count includes non-current versions, which expire 90 days after replacement.
+              </p>
+            )}
+          </div>
+        )}
       </div>
       {byBytes && (dataVolume || rootVolume) && (
         <p class="note">

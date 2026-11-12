@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.5.0
+
+### Fixed
+
+- A publisher that goes silent when down (a heartbeat with no canary) now records the whole outage: the minutes with no datapoint count as down. Before, an episode began at the first explicit zero, so a 26-minute outage was recorded as one minute.
+- The RECOVERED email sent when no outage was recorded no longer claims the environment slept; it says no outage was recorded, with both possible reasons.
+
+### Changed
+
+- The status page omits the Data volume and Media columns of the Storage card, and the Commit and Base rows of the machine image, when the payload has no value for them, instead of showing dashes.
+
+### Upgrade
+
+- No action.
+
 ## v0.4.0
 
 ### Added

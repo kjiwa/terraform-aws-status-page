@@ -65,6 +65,9 @@ function imageBlock(img: Image | PanelError, repo: string | null, heading = true
   // -- falls back to the build-time name tag, then to a bare dash, never to
   // the raw source AMI id itself.
   const base = img.source_ami_description || img.source_ami_name || null;
+  const provenance: [string, KvValue][] = [];
+  if (img.git_sha) provenance.push(['Commit', commitCell(repo, img.git_sha)]);
+  if (base) provenance.push(['Base', base]);
   return (
     <div>
       {heading && <h4>Machine image</h4>}
@@ -73,8 +76,7 @@ function imageBlock(img: Image | PanelError, repo: string | null, heading = true
           ['Name', img.name],
           ['AMI', img.id],
           ['Built', fmtDate(img.creation_date)],
-          ['Commit', commitCell(repo, img.git_sha)],
-          ['Base', base],
+          ...provenance,
         ]}
       />
     </div>
