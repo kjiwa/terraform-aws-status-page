@@ -100,3 +100,35 @@ describe('Storage panel: resting legend', () => {
     expect(legend).toContain('root 34.0% (5.3 GiB)');
   });
 });
+
+describe('Storage and image panels: absent inputs', () => {
+  it('omit the data volume, media, commit and base instead of showing dashes', async () => {
+    const payload = payloadFor(ALL_TOGGLES_ON);
+    if (!payload.storage || 'error' in payload.storage) throw new Error('fixture storage');
+    payload.storage.volumes = payload.storage.volumes?.filter((v) => v.role === 'root');
+    payload.storage.bucket_size_bytes = null;
+    payload.storage.bucket_object_count = null;
+    if (!payload.image || 'error' in payload.image) throw new Error('fixture image');
+    delete payload.deployment;
+    payload.image.git_sha = null;
+    payload.image.source_ami_name = null;
+    payload.image.source_ami_description = null;
+    const mounted = mountStatus({
+      toggles: ALL_TOGGLES_ON,
+      tokens: { access: 'test-access-token' },
+      routes: { data: [{ status: 200, body: payload }] },
+    });
+    await mounted.settled();
+    expect(mounted.pageErrors).toEqual([]);
+
+    const headings = Array.from(storageCard(mounted.document).querySelectorAll('h4')).map(
+      (h) => h.textContent,
+    );
+    expect(headings).toContain('Root volume');
+    expect(headings).not.toContain('Data volume');
+    expect(headings).not.toContain('Media');
+    const labels = Array.from(mounted.document.querySelectorAll('dt')).map((t) => t.textContent);
+    expect(labels).not.toContain('Commit');
+    expect(labels).not.toContain('Base');
+  });
+});

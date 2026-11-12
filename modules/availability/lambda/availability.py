@@ -458,14 +458,16 @@ def handle_recovered(detail):
 
 
 def notify_wake():
-    """The alarm cleared with no open outage: the DOWN handler never ran
-    because the alarm rule is disabled while the environment sleeps. The
-    alarm's own edges span the sleep, not an outage, so no episode is
+    """The alarm cleared with no open outage: the DOWN handler never ran for
+    this alarm, either because the alarm rule is disabled while the
+    environment sleeps or because the alarm rose before this function was
+    wired to it. The alarm's own edges are not an outage, so no episode is
     recorded.
     """
     notify(
-        f"[{NAME_PREFIX}] RECOVERED - woke from sleep",
-        f"{SITE_URL} is serving again after the environment slept.",
+        f"[{NAME_PREFIX}] RECOVERED - no outage recorded",
+        f"{SITE_URL} is serving again. The alarm cleared with no recorded outage: "
+        "the environment was asleep, or the alarm rose before outages were being recorded.",
     )
 
 
@@ -666,19 +668,34 @@ def edge_metric_series(start, end):
     return sorted(zip(result["Timestamps"], result["Values"]))
 
 
-def first_down(series, fallback):
-    """Timestamp of the first failing datapoint; outage start."""
+def down_times(series):
+    """Timestamps of failing minutes: datapoints below 1, and every minute
+    missing between two datapoints. A heartbeat publisher that is down
+    publishes nothing.
+    """
     downs = [ts for ts, value in series if value < 1]
+    step = datetime.timedelta(seconds=60)
+    for (earlier, _), (later, _) in zip(series, series[1:]):
+        missing = earlier + step
+        while missing < later:
+            downs.append(missing)
+            missing += step
+    return downs
+
+
+def first_down(series, fallback):
+    """Timestamp of the first failing minute; outage start."""
+    downs = down_times(series)
     return min(downs) if downs else fallback
 
 
 def recovery(series, fallback):
-    """Timestamp of the first passing datapoint after the last failing one.
+    """Timestamp of the first passing datapoint after the last failing minute.
 
     Anchoring to the last failure (not the first pass) keeps a mid-outage flap
     from cutting the outage short.
     """
-    downs = [ts for ts, value in series if value < 1]
+    downs = down_times(series)
     if not downs:
         return fallback
     ups = [ts for ts, value in series if value >= 1 and ts > max(downs)]
