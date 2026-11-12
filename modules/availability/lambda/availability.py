@@ -66,6 +66,7 @@ the interruption warning for a spot-reclaim and from the outage start otherwise.
 """
 
 import datetime
+import itertools
 import json
 import os
 import time
@@ -675,7 +676,7 @@ def down_times(series):
     """
     downs = [ts for ts, value in series if value < 1]
     step = datetime.timedelta(seconds=60)
-    for (earlier, _), (later, _) in zip(series, series[1:]):
+    for (earlier, _), (later, _) in itertools.pairwise(series):
         missing = earlier + step
         while missing < later:
             downs.append(missing)
