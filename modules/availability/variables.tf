@@ -23,8 +23,14 @@ variable "alert_email" {
   type        = string
 }
 
+variable "canary_enabled" {
+  description = "If false, an external publisher sends SiteUp every minute: no canary schedule or probe is created, and the alarm treats a silent publisher as down."
+  type        = bool
+  default     = true
+}
+
 variable "active" {
-  description = "If false the environment is asleep: the canary schedule and the alarm-notification rule are disabled so a deliberately-empty ASG does not page anyone. Re-enabling sends one RECOVERED notice once the site is back."
+  description = "If false the environment is asleep: the canary schedule (when `canary_enabled`) and the alarm-notification rule are disabled so a deliberately-empty ASG does not page anyone. With `canary_enabled = false` the external publisher must also stop sending SiteUp. Re-enabling sends one RECOVERED notice once the site is back."
   type        = bool
 }
 

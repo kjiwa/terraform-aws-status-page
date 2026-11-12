@@ -68,7 +68,7 @@ resource "aws_sns_topic_subscription" "alerts_email" {
 # indistinguishable from "unknown" and should be loud.
 resource "aws_cloudwatch_metric_alarm" "site_down" {
   alarm_name          = "${var.name_prefix}-site-down"
-  alarm_description   = "Cannot reach https://${var.primary_domain}/."
+  alarm_description   = var.canary_enabled ? "Cannot reach https://${var.primary_domain}/." : "No SiteUp heartbeat from ${var.primary_domain}."
   namespace           = var.metric_namespace
   metric_name         = "SiteUp"
   statistic           = "Minimum"

@@ -67,7 +67,7 @@ run "names_derive_from_prefix" {
 
   assert {
     condition = alltrue([
-      aws_cloudwatch_event_rule.canary.name == "example-site-availability-canary",
+      aws_cloudwatch_event_rule.canary[0].name == "example-site-availability-canary",
       aws_cloudwatch_event_rule.alarm_state.name == "example-site-availability-alarm-state",
       aws_cloudwatch_event_rule.instance_refresh_change.name == "example-site-instance-refresh-change",
       aws_cloudwatch_event_rule.deployment_change[0].name == "example-site-deployment-change",
@@ -122,5 +122,32 @@ run "no_codedeploy_drops_deployment_change" {
   assert {
     condition     = aws_lambda_function.availability.environment[0].variables["CODEDEPLOY_APP_NAME"] == ""
     error_message = "CODEDEPLOY_APP_NAME must be empty"
+  }
+}
+
+run "heartbeat_drops_canary" {
+  command = plan
+
+  variables {
+    canary_enabled = false
+  }
+
+  assert {
+    condition = (
+      length(aws_cloudwatch_event_rule.canary) == 0 &&
+      length(aws_cloudwatch_event_target.canary) == 0 &&
+      length(aws_lambda_permission.canary) == 0
+    )
+    error_message = "canary rule, target and permission must not exist with canary_enabled = false"
+  }
+
+  assert {
+    condition     = aws_lambda_function.availability.environment[0].variables["CANARY_ENABLED"] == "false"
+    error_message = "CANARY_ENABLED must be false"
+  }
+
+  assert {
+    condition     = aws_cloudwatch_metric_alarm.site_down.alarm_description == "No SiteUp heartbeat from example.com."
+    error_message = "Alarm description must name the heartbeat"
   }
 }

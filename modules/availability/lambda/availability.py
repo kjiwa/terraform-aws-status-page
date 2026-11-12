@@ -76,6 +76,7 @@ import boto3
 from botocore.config import Config
 
 SITE_URL = os.environ["SITE_URL"]
+CANARY_ENABLED = os.environ["CANARY_ENABLED"] == "true"
 ASG_NAME = os.environ["ASG_NAME"]
 SNS_TOPIC_ARN = os.environ["SNS_TOPIC_ARN"]
 STATE_PARAM = os.environ["STATE_PARAM"]
@@ -176,8 +177,10 @@ def handler(event, context):
         handle_deployment(event)
     elif detail_type.startswith(REFRESH_DETAIL_PREFIX):
         handle_instance_refresh(event)
-    else:  # EventBridge "Scheduled Event"
+    elif CANARY_ENABLED:  # EventBridge "Scheduled Event"
         probe()
+    else:
+        print(f"ignoring {detail_type or 'event'}: canary disabled")
 
 
 # --- canary -------------------------------------------------------------------

@@ -48,6 +48,7 @@ resource "aws_lambda_function" "availability" {
   environment {
     variables = {
       SITE_URL                       = local.site_url
+      CANARY_ENABLED                 = tostring(var.canary_enabled)
       ASG_NAME                       = var.asg_name
       SNS_TOPIC_ARN                  = aws_sns_topic.alerts.arn
       STATE_PARAM                    = aws_ssm_parameter.state.name
@@ -126,6 +127,7 @@ resource "aws_cloudwatch_log_stream" "changes" {
 # --- canary schedule -----------------------------------------------------------
 
 resource "aws_cloudwatch_event_rule" "canary" {
+  count               = var.canary_enabled ? 1 : 0
   name                = "${var.name_prefix}-availability-canary"
   description         = "Per-minute end-to-end probe of the site."
   schedule_expression = "rate(1 minute)"
@@ -141,17 +143,19 @@ resource "aws_cloudwatch_event_rule" "canary" {
 }
 
 resource "aws_cloudwatch_event_target" "canary" {
-  rule      = aws_cloudwatch_event_rule.canary.name
+  count     = var.canary_enabled ? 1 : 0
+  rule      = aws_cloudwatch_event_rule.canary[0].name
   target_id = "availability-lambda"
   arn       = aws_lambda_function.availability.arn
 }
 
 resource "aws_lambda_permission" "canary" {
+  count         = var.canary_enabled ? 1 : 0
   statement_id  = "AllowCanarySchedule"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.availability.function_name
   principal     = "events.amazonaws.com"
-  source_arn    = aws_cloudwatch_event_rule.canary.arn
+  source_arn    = aws_cloudwatch_event_rule.canary[0].arn
 }
 
 # --- IAM -------------------------------------------------------------------------

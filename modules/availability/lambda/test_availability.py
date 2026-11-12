@@ -54,6 +54,7 @@ if "botocore" not in sys.modules:
 # availability.py reads these via os.environ[...] (no default) at module level.
 for _var, _val in [
     ("SITE_URL", "https://example.invalid"),
+    ("CANARY_ENABLED", "true"),
     ("NAME_PREFIX", "test-site"),
     ("ASG_NAME", "test-asg"),
     ("SNS_TOPIC_ARN", "arn:aws:sns:us-east-1:123456789012:test-topic"),
@@ -466,6 +467,28 @@ class DownPathDegradationTests(unittest.TestCase):
         with mock.patch.object(availability, "autoscaling", autoscaling):
             self.assertIsNone(availability.current_asg_instance())
             self.assertIsNone(availability.last_scaling_activity())
+
+
+class ScheduledEventTests(unittest.TestCase):
+    def test_scheduled_event_probes_when_canary_enabled(self):
+        with (
+            mock.patch.object(availability, "CANARY_ENABLED", True),
+            mock.patch.object(availability, "probe") as probe,
+        ):
+            availability.handler({"detail-type": "Scheduled Event"}, None)
+        probe.assert_called_once_with()
+
+    def test_scheduled_event_without_canary_skips_probe(self):
+        with (
+            mock.patch.object(availability, "CANARY_ENABLED", False),
+            mock.patch.object(availability, "probe") as probe,
+            mock.patch.object(
+                availability.cloudwatch, "put_metric_data", create=True
+            ) as put,
+        ):
+            availability.handler({"detail-type": "Scheduled Event"}, None)
+        probe.assert_not_called()
+        put.assert_not_called()
 
 
 if __name__ == "__main__":
