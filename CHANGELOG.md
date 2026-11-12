@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.4.0
+
+### Added
+
+- `modules/availability` takes `canary_enabled` (default `true`). With `false`, the canary rule, target and permission are not created and the Lambda ignores scheduled events, so an external publisher can send `SiteUp` every minute. The `site_down` alarm still treats silence as down; its description names the heartbeat.
+
+### Upgrade
+
+- No action. Terraform maps the existing canary resources to index `[0]` without a `moved` block (checked with `terraform plan`: no changes).
+
 ## v0.3.2
 
 ### Fixed
