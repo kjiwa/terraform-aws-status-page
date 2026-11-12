@@ -115,15 +115,10 @@ MARKER_LEAD_AFTER_APP_STOPPED_S = (-MARKER_LAG_S, MARKER_FLOOR_S)
 PULLED_ATTRIBUTION_WINDOW_S = 10 * 60
 
 # Causes that represent a deliberate, self-inflicted interruption rather than
-# an involuntary loss of capacity. Stored on each episode as `planned`, which
-# the status page reads as-is.
-PLANNED_CAUSES = {
-    "rightsize",
-    "deploy",
-    "instance-refresh",
-    "capacity-change",
-    "backup",
-}
+# an involuntary loss of capacity (comma-separated in the environment; see
+# the planned_causes input). Stored on each episode as `planned`, which the
+# status page reads as-is.
+PLANNED_CAUSES = {c for c in os.environ["PLANNED_CAUSES"].split(",") if c}
 
 # How far to widen the metric query around the alarm timestamps when hunting
 # for the real edges. The alarm fires within ~3 min of the first failing probe

@@ -151,3 +151,35 @@ run "heartbeat_drops_canary" {
     error_message = "Alarm description must name the heartbeat"
   }
 }
+
+run "planned_causes_default_and_override" {
+  command = plan
+
+  assert {
+    condition     = aws_lambda_function.availability.environment[0].variables["PLANNED_CAUSES"] == "rightsize,deploy,instance-refresh,capacity-change,backup"
+    error_message = "PLANNED_CAUSES must default to the deliberate causes"
+  }
+}
+
+run "planned_causes_empty_counts_every_outage" {
+  command = plan
+
+  variables {
+    planned_causes = []
+  }
+
+  assert {
+    condition     = aws_lambda_function.availability.environment[0].variables["PLANNED_CAUSES"] == ""
+    error_message = "An empty planned_causes must reach the function as an empty list"
+  }
+}
+
+run "planned_causes_rejects_unknown_cause" {
+  command = plan
+
+  variables {
+    planned_causes = ["maintenance"]
+  }
+
+  expect_failures = [var.planned_causes]
+}

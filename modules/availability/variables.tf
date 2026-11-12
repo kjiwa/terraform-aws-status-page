@@ -29,6 +29,17 @@ variable "canary_enabled" {
   default     = true
 }
 
+variable "planned_causes" {
+  description = "Outage causes recorded as planned, which the status page leaves out of its uptime series. Any of rightsize, deploy, instance-refresh, capacity-change and backup. Empty counts every outage."
+  type        = list(string)
+  default     = ["rightsize", "deploy", "instance-refresh", "capacity-change", "backup"]
+
+  validation {
+    condition     = alltrue([for cause in var.planned_causes : contains(["rightsize", "deploy", "instance-refresh", "capacity-change", "backup"], cause)])
+    error_message = "planned_causes may hold only rightsize, deploy, instance-refresh, capacity-change and backup, the causes the availability function can attribute as deliberate."
+  }
+}
+
 variable "active" {
   description = "If false the environment is asleep: the canary schedule (when `canary_enabled`) and the alarm-notification rule are disabled so a deliberately-empty ASG does not page anyone. With `canary_enabled = false` the external publisher must also stop sending SiteUp. Re-enabling sends one RECOVERED notice once the site is back."
   type        = bool

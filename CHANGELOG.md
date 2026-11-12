@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.6.0
+
+### Added
+
+- `modules/availability` takes `planned_causes` (default: rightsize, deploy, instance-refresh, capacity-change, backup). Episodes with a listed cause are recorded as planned and left out of the status page's uptime series. An empty list counts every outage.
+
+### Upgrade
+
+- No action. The default keeps today's behavior.
+
 ## v0.5.0
 
 ### Fixed
