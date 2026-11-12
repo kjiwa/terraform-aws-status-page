@@ -812,7 +812,7 @@
             "avg": 0.9991154951760546,
             "samples": 65,
             "partial": true,
-            "expected_samples": 60
+            "expected_samples": null
           }
         ],
         "latency": {

@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.7.1
+
+### Fixed
+
+- A partial reliability cell with no `expected_samples` read "(in progress, N/null checks)" in the strip readout. It now reads "(in progress, N checks)".
+
 ## v0.7.0
 
 ### Added

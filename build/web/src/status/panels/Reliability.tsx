@@ -65,7 +65,10 @@ function cellDetail(cell: ReliabilityCell, r: ReliabilityRange): string {
       ? null
       : (1 - cell.avg) * (cell.samples / cell.expected_samples) * r.cell_s;
   if (down !== null && Math.round(down) >= 1) title += ` · ${fmtDuration(down)} down`;
-  if (cell.partial) title += ` (in progress, ${cell.samples}/${cell.expected_samples} checks)`;
+  if (cell.partial) {
+    const checks = cell.expected_samples ? `${cell.samples}/${cell.expected_samples}` : cell.samples;
+    title += ` (in progress, ${checks} checks)`;
+  }
   return title;
 }
 
