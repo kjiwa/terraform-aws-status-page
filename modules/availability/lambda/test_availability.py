@@ -524,17 +524,64 @@ class ScheduledEventTests(unittest.TestCase):
             availability.handler({"detail-type": "Scheduled Event"}, None)
         probe.assert_called_once_with()
 
-    def test_scheduled_event_without_canary_skips_probe(self):
+    def test_scheduled_event_without_canary_backfills_instead_of_probing(self):
         with (
             mock.patch.object(availability, "CANARY_ENABLED", False),
             mock.patch.object(availability, "probe") as probe,
-            mock.patch.object(
-                availability.cloudwatch, "put_metric_data", create=True
-            ) as put,
+            mock.patch.object(availability, "backfill") as backfill,
         ):
             availability.handler({"detail-type": "Scheduled Event"}, None)
         probe.assert_not_called()
-        put.assert_not_called()
+        backfill.assert_called_once_with()
+
+    def test_other_events_do_not_backfill(self):
+        with (
+            mock.patch.object(availability, "CANARY_ENABLED", False),
+            mock.patch.object(availability, "backfill") as backfill,
+        ):
+            availability.handler({"detail-type": "Something Else"}, None)
+        backfill.assert_not_called()
+
+
+class BackfillTests(unittest.TestCase):
+    """A heartbeat publisher that is down publishes nothing; the backfill
+    writes the explicit 0 so the alarm and every reader see the minute.
+    """
+
+    NOW = dt(2026, 7, 15, 12, 10, 30)
+    MINUTE = dt(2026, 7, 15, 12, 8, 0)
+
+    def _run(self, timestamps):
+        cloudwatch = mock.Mock()
+        cloudwatch.get_metric_data.return_value = {
+            "MetricDataResults": [
+                {"Timestamps": timestamps, "Values": [1.0] * len(timestamps)}
+            ]
+        }
+        with mock.patch.object(availability, "cloudwatch", cloudwatch):
+            availability.backfill(self.NOW)
+        return cloudwatch
+
+    def test_writes_zero_for_a_minute_with_no_datapoint(self):
+        cloudwatch = self._run([])
+        query = cloudwatch.get_metric_data.call_args.kwargs
+        self.assertEqual(query["StartTime"], self.MINUTE)
+        self.assertEqual(query["EndTime"], self.MINUTE + datetime.timedelta(minutes=1))
+        cloudwatch.put_metric_data.assert_called_once_with(
+            Namespace=availability.METRIC_NAMESPACE,
+            MetricData=[
+                {
+                    "MetricName": "SiteUp",
+                    "Value": 0,
+                    "Unit": "None",
+                    "Timestamp": self.MINUTE,
+                }
+            ],
+        )
+
+    def test_writes_nothing_for_a_minute_that_has_a_datapoint(self):
+        cloudwatch = self._run([self.MINUTE])
+        cloudwatch.put_metric_data.assert_not_called()
 
 
 if __name__ == "__main__":

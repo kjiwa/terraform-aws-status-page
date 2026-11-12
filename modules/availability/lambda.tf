@@ -125,38 +125,52 @@ resource "aws_cloudwatch_log_stream" "changes" {
   log_group_name = aws_cloudwatch_log_group.episodes.name
 }
 
-# --- canary schedule -----------------------------------------------------------
+# --- schedule ------------------------------------------------------------------
 
-resource "aws_cloudwatch_event_rule" "canary" {
-  count               = var.canary_enabled ? 1 : 0
-  name                = "${var.name_prefix}-availability-canary"
-  description         = "Per-minute end-to-end probe of the site."
+# Runs every minute: the canary probe, or with canary_enabled = false the
+# heartbeat backfill that writes the zero a silent publisher cannot.
+resource "aws_cloudwatch_event_rule" "schedule" {
+  name                = "${var.name_prefix}-availability-schedule"
+  description         = var.canary_enabled ? "Per-minute end-to-end probe of the site." : "Per-minute backfill of the SiteUp heartbeat."
   schedule_expression = "rate(1 minute)"
-  # Asleep env: no probes. The alarm goes to (suppressed) ALARM via
+  # Asleep env: nothing scheduled. The alarm goes to (suppressed) ALARM via
   # treat_missing_data = breaching, which is what makes the wake path honest:
-  # re-enabling the canary drives ALARM -> OK and one RECOVERED email once the
-  # site actually serves again.
+  # re-enabling the schedule drives ALARM -> OK and one RECOVERED email once
+  # the site actually serves again.
   state = var.active ? "ENABLED" : "DISABLED"
 
   tags = {
-    Name = "${var.name_prefix}-availability-canary"
+    Name = "${var.name_prefix}-availability-schedule"
   }
 }
 
-resource "aws_cloudwatch_event_target" "canary" {
-  count     = var.canary_enabled ? 1 : 0
-  rule      = aws_cloudwatch_event_rule.canary[0].name
+resource "aws_cloudwatch_event_target" "schedule" {
+  rule      = aws_cloudwatch_event_rule.schedule.name
   target_id = "availability-lambda"
   arn       = aws_lambda_function.availability.arn
 }
 
-resource "aws_lambda_permission" "canary" {
-  count         = var.canary_enabled ? 1 : 0
-  statement_id  = "AllowCanarySchedule"
+resource "aws_lambda_permission" "schedule" {
+  statement_id  = "AllowSchedule"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.availability.function_name
   principal     = "events.amazonaws.com"
-  source_arn    = aws_cloudwatch_event_rule.canary[0].arn
+  source_arn    = aws_cloudwatch_event_rule.schedule.arn
+}
+
+moved {
+  from = aws_cloudwatch_event_rule.canary[0]
+  to   = aws_cloudwatch_event_rule.schedule
+}
+
+moved {
+  from = aws_cloudwatch_event_target.canary[0]
+  to   = aws_cloudwatch_event_target.schedule
+}
+
+moved {
+  from = aws_lambda_permission.canary[0]
+  to   = aws_lambda_permission.schedule
 }
 
 # --- IAM -------------------------------------------------------------------------

@@ -67,7 +67,7 @@ run "names_derive_from_prefix" {
 
   assert {
     condition = alltrue([
-      aws_cloudwatch_event_rule.canary[0].name == "example-site-availability-canary",
+      aws_cloudwatch_event_rule.schedule.name == "example-site-availability-schedule",
       aws_cloudwatch_event_rule.alarm_state.name == "example-site-availability-alarm-state",
       aws_cloudwatch_event_rule.instance_refresh_change.name == "example-site-instance-refresh-change",
       aws_cloudwatch_event_rule.deployment_change[0].name == "example-site-deployment-change",
@@ -125,7 +125,7 @@ run "no_codedeploy_drops_deployment_change" {
   }
 }
 
-run "heartbeat_drops_canary" {
+run "heartbeat_keeps_the_schedule" {
   command = plan
 
   variables {
@@ -134,11 +134,10 @@ run "heartbeat_drops_canary" {
 
   assert {
     condition = (
-      length(aws_cloudwatch_event_rule.canary) == 0 &&
-      length(aws_cloudwatch_event_target.canary) == 0 &&
-      length(aws_lambda_permission.canary) == 0
+      aws_cloudwatch_event_rule.schedule.state == "ENABLED" &&
+      aws_cloudwatch_event_target.schedule.target_id == "availability-lambda"
     )
-    error_message = "canary rule, target and permission must not exist with canary_enabled = false"
+    error_message = "The schedule must stay on with canary_enabled = false: it runs the heartbeat backfill"
   }
 
   assert {
@@ -182,4 +181,36 @@ run "planned_causes_rejects_unknown_cause" {
   }
 
   expect_failures = [var.planned_causes]
+}
+
+run "alarm_defaults_to_two_of_three" {
+  command = plan
+
+  assert {
+    condition     = aws_cloudwatch_metric_alarm.site_down.evaluation_periods == 3 && aws_cloudwatch_metric_alarm.site_down.datapoints_to_alarm == 2
+    error_message = "The default alarm must stay 2 of 3"
+  }
+}
+
+run "alarm_takes_one_of_three" {
+  command = plan
+
+  variables {
+    site_down_alarm = { datapoints_to_alarm = 1 }
+  }
+
+  assert {
+    condition     = aws_cloudwatch_metric_alarm.site_down.evaluation_periods == 3 && aws_cloudwatch_metric_alarm.site_down.datapoints_to_alarm == 1
+    error_message = "site_down_alarm must set the datapoints and keep the default periods"
+  }
+}
+
+run "alarm_rejects_more_datapoints_than_periods" {
+  command = plan
+
+  variables {
+    site_down_alarm = { evaluation_periods = 2, datapoints_to_alarm = 3 }
+  }
+
+  expect_failures = [var.site_down_alarm]
 }

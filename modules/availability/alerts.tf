@@ -60,12 +60,14 @@ resource "aws_sns_topic_subscription" "alerts_email" {
   endpoint  = var.alert_email
 }
 
-# "Down" = 2 of the last 3 minutes failed; "recovered" = 3 clean minutes.
-# Outages shorter than ~2 min never alarm (deliberate: a reclaim with instant
-# replacement capacity still takes 4+ min of boot/deploy, so every real Spot
-# outage is caught, while single-probe network blips are not). Missing data
-# is breaching: if the metric source itself stops reporting, that is
-# indistinguishable from "unknown" and should be loud.
+# "Down" = datapoints_to_alarm of the last evaluation_periods minutes failed
+# (default 2 of 3, which ignores a single-probe blip; 1 of 3 alarms on any
+# bad minute). Recovery needs evaluation_periods clean minutes. CloudWatch
+# ignores treat_missing_data while enough real datapoints exist in its
+# evaluation range, so a silent minute counts only because the heartbeat
+# backfill (or the canary) writes an explicit 0, so a silent
+# publisher alarms about 3 minutes after it stops (2 of lag, then the evaluation). Missing data is breaching
+# for the rest: a metric source that stops reporting is loud.
 resource "aws_cloudwatch_metric_alarm" "site_down" {
   alarm_name          = "${var.name_prefix}-site-down"
   alarm_description   = var.canary_enabled ? "Cannot reach https://${var.primary_domain}/." : "No SiteUp heartbeat from ${var.primary_domain}."
@@ -73,8 +75,8 @@ resource "aws_cloudwatch_metric_alarm" "site_down" {
   metric_name         = "SiteUp"
   statistic           = "Minimum"
   period              = 60
-  evaluation_periods  = 3
-  datapoints_to_alarm = 2
+  evaluation_periods  = var.site_down_alarm.evaluation_periods
+  datapoints_to_alarm = var.site_down_alarm.datapoints_to_alarm
   threshold           = 1
   comparison_operator = "LessThanThreshold"
   treat_missing_data  = "breaching"
@@ -90,8 +92,8 @@ resource "aws_cloudwatch_metric_alarm" "site_down" {
 resource "aws_cloudwatch_event_rule" "alarm_state" {
   name        = "${var.name_prefix}-availability-alarm-state"
   description = "Routes site-down alarm transitions to the availability Lambda for enriched DOWN/RECOVERED emails."
-  # Disabled while the env sleeps: the alarm breaches by design (no canary
-  # data) and must not email anyone about it.
+  # Disabled while the env sleeps: the alarm breaches by design (no
+  # datapoints) and must not email anyone about it.
   state = var.active ? "ENABLED" : "DISABLED"
 
   event_pattern = jsonencode({
