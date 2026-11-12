@@ -24,7 +24,7 @@ variable "alert_email" {
 }
 
 variable "canary_enabled" {
-  description = "If false, an external publisher sends SiteUp every minute: no canary schedule or probe is created, and the alarm treats a silent publisher as down."
+  description = "If false, an external publisher sends SiteUp every minute and the Lambda runs no probe: its schedule writes SiteUp = 0 for each minute the publisher missed, so a silent publisher counts as down."
   type        = bool
   default     = true
 }
@@ -40,8 +40,22 @@ variable "planned_causes" {
   }
 }
 
+variable "site_down_alarm" {
+  description = "When the site-down alarm fires: datapoints_to_alarm bad minutes within the last evaluation_periods. The default 2 of 3 ignores a one-minute blip; 1 of 3 alarms on any bad minute."
+  type = object({
+    evaluation_periods  = optional(number, 3)
+    datapoints_to_alarm = optional(number, 2)
+  })
+  default = {}
+
+  validation {
+    condition     = var.site_down_alarm.datapoints_to_alarm >= 1 && var.site_down_alarm.datapoints_to_alarm <= var.site_down_alarm.evaluation_periods
+    error_message = "datapoints_to_alarm must be at least 1 and at most evaluation_periods."
+  }
+}
+
 variable "active" {
-  description = "If false the environment is asleep: the canary schedule (when `canary_enabled`) and the alarm-notification rule are disabled so a deliberately-empty ASG does not page anyone. With `canary_enabled = false` the external publisher must also stop sending SiteUp. Re-enabling sends one RECOVERED notice once the site is back."
+  description = "If false the environment is asleep: the schedule and the alarm-notification rule are disabled so a deliberately-empty ASG does not page anyone. With `canary_enabled = false` the external publisher must also stop sending SiteUp. Re-enabling sends one RECOVERED notice once the site is back."
   type        = bool
 }
 

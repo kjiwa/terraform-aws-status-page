@@ -176,7 +176,7 @@ def handler(event, context):
     elif CANARY_ENABLED:  # EventBridge "Scheduled Event"
         probe()
     else:
-        print(f"ignoring {detail_type or 'event'}: canary disabled")
+        backfill()
 
 
 # --- canary -------------------------------------------------------------------
@@ -222,6 +222,53 @@ def probe():
             }
         )
     )
+
+
+# --- heartbeat backfill -------------------------------------------------------
+
+# The minute checked is this far behind now, so a heartbeat that arrives a
+# little late is not mistaken for a missing one and the alarm's evaluation
+# range still reaches the zero.
+BACKFILL_LAG = datetime.timedelta(minutes=2)
+
+
+def backfill(now=None):
+    """Write SiteUp=0 for the minute two behind now if the publisher sent
+    nothing for it. A publisher that is down is silent, and CloudWatch ignores
+    missing data once enough real points exist in the evaluation range, so
+    without an explicit zero a short outage neither alarms nor counts.
+    """
+    now = now or datetime.datetime.now(datetime.UTC)
+    minute = now.replace(second=0, microsecond=0) - BACKFILL_LAG
+    result = cloudwatch.get_metric_data(
+        MetricDataQueries=[
+            {
+                "Id": "sent",
+                "MetricStat": {
+                    "Metric": {"Namespace": METRIC_NAMESPACE, "MetricName": "SiteUp"},
+                    "Period": 60,
+                    "Stat": "SampleCount",
+                },
+                "ReturnData": True,
+            }
+        ],
+        StartTime=minute,
+        EndTime=minute + datetime.timedelta(minutes=1),
+    )["MetricDataResults"][0]
+    missing = not result["Values"]
+    if missing:
+        cloudwatch.put_metric_data(
+            Namespace=METRIC_NAMESPACE,
+            MetricData=[
+                {
+                    "MetricName": "SiteUp",
+                    "Value": 0,
+                    "Unit": "None",
+                    "Timestamp": minute,
+                }
+            ],
+        )
+    print(json.dumps({"backfill": iso(minute), "wrote_zero": missing}))
 
 
 # --- spot interruption ----------------------------------------------------------

@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.7.0
+
+### Added
+
+- `modules/availability` takes `site_down_alarm` (`evaluation_periods = 3`, `datapoints_to_alarm = 2` by default, so today's alarm). `{ datapoints_to_alarm = 1 }` alarms on any bad minute.
+
+### Changed
+
+- With `canary_enabled = false`, the per-minute schedule runs a backfill: for the minute two behind now it writes `SiteUp = 0` if the publisher sent nothing. A silent publisher now alarms and counts against uptime like a failing probe. CloudWatch ignores `treat_missing_data` while enough real datapoints exist in its evaluation range, so a short silence never alarmed before.
+- The schedule rule, target and permission are no longer count-gated and are named `schedule`.
+
+### Upgrade
+
+- Applying replaces the schedule rule and the Lambda permission (the rule is now named `<name_prefix>-availability-schedule`). `moved` blocks keep the state; nothing else changes. With `canary_enabled = true` behavior is unchanged.
+
 ## v0.6.0
 
 ### Added
