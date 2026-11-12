@@ -8,7 +8,7 @@
 
 ### Changed
 
-- With `canary_enabled = false`, the per-minute schedule runs a backfill: for the minute two behind now it writes `SiteUp = 0` if the publisher sent nothing. A silent publisher now alarms and counts against uptime like a failing probe. CloudWatch ignores `treat_missing_data` while enough real datapoints exist in its evaluation range, so a short silence never alarmed before.
+- With `canary_enabled = false`, the per-minute schedule runs a backfill: for the minute two behind now it writes `SiteUp = 0` if the publisher sent nothing. A silent publisher now alarms, about 3 minutes after it stops, and counts against uptime like a failing probe. CloudWatch ignores `treat_missing_data` while enough real datapoints exist in its evaluation range, so a short silence never alarmed before.
 - The schedule rule, target and permission are no longer count-gated and are named `schedule`.
 
 ### Upgrade

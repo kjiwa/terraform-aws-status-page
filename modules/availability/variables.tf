@@ -49,8 +49,13 @@ variable "site_down_alarm" {
   default = {}
 
   validation {
-    condition     = var.site_down_alarm.datapoints_to_alarm >= 1 && var.site_down_alarm.datapoints_to_alarm <= var.site_down_alarm.evaluation_periods
-    error_message = "datapoints_to_alarm must be at least 1 and at most evaluation_periods."
+    condition = (
+      floor(var.site_down_alarm.evaluation_periods) == var.site_down_alarm.evaluation_periods &&
+      floor(var.site_down_alarm.datapoints_to_alarm) == var.site_down_alarm.datapoints_to_alarm &&
+      var.site_down_alarm.datapoints_to_alarm >= 1 &&
+      var.site_down_alarm.datapoints_to_alarm <= var.site_down_alarm.evaluation_periods
+    )
+    error_message = "evaluation_periods and datapoints_to_alarm must be whole numbers with 1 <= datapoints_to_alarm <= evaluation_periods."
   }
 }
 

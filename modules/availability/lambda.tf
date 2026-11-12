@@ -1,5 +1,5 @@
 # One Lambda handles the whole availability story: the per-minute canary
-# probe or heartbeat backfill, Spot-interruption context capture, and DOWN/RECOVERED notifications.
+# probe, Spot-interruption context capture, and DOWN/RECOVERED notifications.
 # Splitting it into three functions would triple the IAM/wiring for a few
 # hundred lines of stdlib Python that share state and helpers.
 

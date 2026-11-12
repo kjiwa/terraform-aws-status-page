@@ -65,7 +65,8 @@ resource "aws_sns_topic_subscription" "alerts_email" {
 # bad minute). Recovery needs evaluation_periods clean minutes. CloudWatch
 # ignores treat_missing_data while enough real datapoints exist in its
 # evaluation range, so a silent minute counts only because the heartbeat
-# backfill (or the canary) writes an explicit 0. Missing data is breaching
+# backfill (or the canary) writes an explicit 0, so a silent
+# publisher alarms about 3 minutes after it stops (2 of lag, then the evaluation). Missing data is breaching
 # for the rest: a metric source that stops reporting is loud.
 resource "aws_cloudwatch_metric_alarm" "site_down" {
   alarm_name          = "${var.name_prefix}-site-down"

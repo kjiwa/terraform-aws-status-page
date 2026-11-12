@@ -534,6 +534,14 @@ class ScheduledEventTests(unittest.TestCase):
         probe.assert_not_called()
         backfill.assert_called_once_with()
 
+    def test_other_events_do_not_backfill(self):
+        with (
+            mock.patch.object(availability, "CANARY_ENABLED", False),
+            mock.patch.object(availability, "backfill") as backfill,
+        ):
+            availability.handler({"detail-type": "Something Else"}, None)
+        backfill.assert_not_called()
+
 
 class BackfillTests(unittest.TestCase):
     """A heartbeat publisher that is down publishes nothing; the backfill

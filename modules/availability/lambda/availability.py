@@ -137,6 +137,7 @@ UNHEALTHY_CAUSE = "health"
 SCALING_ACTIVITY_PAGE = 100
 
 # Terminal states only; in-flight states carry no outcome and write nothing.
+SCHEDULED_DETAIL_TYPE = "Scheduled Event"
 DEPLOYMENT_DETAIL_TYPE = "CodeDeploy Deployment State-change Notification"
 DEPLOYMENT_OUTCOMES = {"SUCCESS": "succeeded", "FAILURE": "failed", "STOP": "stopped"}
 REFRESH_DETAIL_PREFIX = "EC2 Auto Scaling Instance Refresh "
@@ -173,10 +174,10 @@ def handler(event, context):
         handle_deployment(event)
     elif detail_type.startswith(REFRESH_DETAIL_PREFIX):
         handle_instance_refresh(event)
-    elif CANARY_ENABLED:  # EventBridge "Scheduled Event"
-        probe()
+    elif detail_type == SCHEDULED_DETAIL_TYPE:
+        probe() if CANARY_ENABLED else backfill()
     else:
-        backfill()
+        print(f"ignoring {detail_type or 'event'}")
 
 
 # --- canary -------------------------------------------------------------------
