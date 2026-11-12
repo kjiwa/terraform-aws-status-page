@@ -5,6 +5,11 @@ import { ALL_TOGGLES_ON } from '../support/shell.ts';
 
 const LEAKED = /\b(null|undefined|NaN)\b/;
 
+// jsdom's Window type omits KeyboardEvent, though the real window has it.
+function keyboardEventCtor(win: Window): typeof KeyboardEvent {
+  return (win as unknown as { KeyboardEvent: typeof KeyboardEvent }).KeyboardEvent;
+}
+
 function leakedText(doc: Document): string[] {
   const found: string[] = [];
   for (const el of doc.querySelectorAll('body, body *')) {
@@ -46,8 +51,7 @@ describe('rendered text never leaks a missing value', () => {
     const strip = mounted.document.querySelector('[role="slider"]');
     if (!strip) throw new Error('status-null-text: no reliability strip');
     const count = Number(strip.getAttribute('aria-valuemax')) + 1;
-    const KeyboardEvent = (mounted.window as unknown as { KeyboardEvent: typeof KeyboardEvent })
-      .KeyboardEvent;
+    const KeyboardEvent = keyboardEventCtor(mounted.window);
     const readouts: string[] = [];
     strip.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }));
     for (let i = 0; i < count; i++) {
