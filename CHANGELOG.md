@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.7.2
+
+### Changed
+
+- Web build dependencies updated: preact 11.2.0, jsdom 31, vite 8.3.8, prettier 3.10, typescript-eslint 8.72.2, Playwright 1.65. The shipped `status.html` is rebuilt; no module input or output changes.
+
 ## v0.7.1
 
 ### Fixed
