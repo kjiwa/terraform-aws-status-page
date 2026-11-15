@@ -178,6 +178,7 @@ def stubbed_aws(**overrides):
         "creator": "user",
     }
     instance = {
+        "InstanceId": "i-1",
         "InstanceType": "t3.small",
         "Architecture": "x86_64",
         "Placement": {"AvailabilityZone": "us-east-1a"},
@@ -210,7 +211,9 @@ def stubbed_aws(**overrides):
                             "DesiredCapacity": 1,
                             "MinSize": 1,
                             "MaxSize": 1,
-                            "Instances": [{"InstanceId": "i-1"}],
+                            "Instances": [
+                                {"InstanceId": "i-1", "LifecycleState": "InService"}
+                            ],
                         }
                     ]
                 }
@@ -226,6 +229,7 @@ def stubbed_aws(**overrides):
                 describe_images=lambda **_: {
                     "Images": [
                         {
+                            "ImageId": "ami-1",
                             "Name": "img",
                             "CreationDate": "2026-01-01T00:00:00.000Z",
                             "Tags": [],

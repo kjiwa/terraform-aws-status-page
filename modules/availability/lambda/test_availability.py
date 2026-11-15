@@ -16,6 +16,7 @@ Runnable two ways:
 
 import datetime
 import importlib
+import json
 import os
 import sys
 import types
@@ -497,6 +498,133 @@ class DownPathDegradationTests(unittest.TestCase):
         with mock.patch.object(availability, "autoscaling", autoscaling):
             self.assertIsNone(availability.current_asg_instance())
             self.assertIsNone(availability.last_scaling_activity())
+
+    def asg(self, *instances):
+        autoscaling = mock.Mock()
+        autoscaling.describe_auto_scaling_groups.return_value = {
+            "AutoScalingGroups": [
+                {
+                    "Instances": [
+                        {"InstanceId": i, "LifecycleState": s} for i, s in instances
+                    ]
+                }
+            ]
+        }
+        return autoscaling
+
+    def test_failed_asg_lookup_has_no_departed_set(self):
+        autoscaling = mock.Mock()
+        autoscaling.describe_auto_scaling_groups.side_effect = RuntimeError("throttled")
+        state = {"interruptions": {"i-1": {"time": "2026-07-15T12:00:00Z"}}}
+        with mock.patch.object(availability, "autoscaling", autoscaling):
+            self.assertIsNone(availability.departed_interruptions(state))
+        self.assertEqual(
+            availability.attributable_interruptions(state, None),
+            state["interruptions"],
+        )
+
+    def test_terminating_instance_counts_as_departed(self):
+        autoscaling = self.asg(("i-1", "Terminating"), ("i-2", "InService"))
+        interruptions = {
+            "i-1": {"time": "2026-07-15T12:00:00Z"},
+            "i-2": {"time": "2026-07-15T12:00:30Z"},
+        }
+        with mock.patch.object(availability, "autoscaling", autoscaling):
+            departed = availability.departed_interruptions(
+                {"interruptions": interruptions}
+            )
+        self.assertEqual(list(departed), ["i-1"])
+
+    def test_in_service_instance_inside_the_warning_window_is_departed(self):
+        now = datetime.datetime.now(UTC)
+        age = availability.INTERRUPTION_WARNING_WINDOW_S
+        interruptions = {
+            "i-fresh": {"time": iso(now - datetime.timedelta(seconds=30))},
+            "i-stale": {"time": iso(now - datetime.timedelta(seconds=age + 60))},
+        }
+        autoscaling = self.asg(("i-fresh", "InService"), ("i-stale", "InService"))
+        with mock.patch.object(availability, "autoscaling", autoscaling):
+            departed = availability.departed_interruptions(
+                {"interruptions": interruptions}
+            )
+        self.assertEqual(list(departed), ["i-fresh"])
+
+    def test_save_state_drops_the_legacy_last_interruption_key(self):
+        ssm = self.FakeSsm()
+        with mock.patch.object(availability, "ssm", ssm):
+            availability.save_state({"last_interruption": {"id": "i-1"}, "a": 1})
+        self.assertEqual(json.loads(ssm.puts[0]["Value"]), {"a": 1})
+
+    def test_current_asg_instance_batches_one_describe_and_skips_missing(self):
+        autoscaling = self.asg(("i-1", "InService"), ("i-2", "InService"))
+        ec2 = mock.Mock()
+        ec2.describe_instances.return_value = {
+            "Reservations": [
+                {
+                    "Instances": [
+                        {
+                            "InstanceId": "i-2",
+                            "InstanceType": "t4g.small",
+                            "Placement": {"AvailabilityZone": "us-east-1a"},
+                            "Architecture": "arm64",
+                            "LaunchTime": dt(2026, 7, 15, 12),
+                        }
+                    ]
+                }
+            ]
+        }
+        with (
+            mock.patch.object(availability, "autoscaling", autoscaling),
+            mock.patch.object(availability, "ec2", ec2),
+        ):
+            found = availability.current_asg_instance()
+        ec2.describe_instances.assert_called_once_with(InstanceIds=["i-1", "i-2"])
+        self.assertEqual(found["id"], "i-2")
+
+    def test_failed_asg_lookup_deletes_no_warning_on_recovery(self):
+        warnings = {
+            "i-1": {
+                "time": "2026-09-15T09:59:00Z",
+                "id": "i-1",
+                "type": "t4g.small",
+                "az": "us-east-1a",
+                "arch": "arm64",
+            },
+            "i-2": {
+                "time": "2026-09-15T09:58:00Z",
+                "id": "i-2",
+                "type": "t4g.small",
+                "az": "us-east-1a",
+                "arch": "arm64",
+            },
+        }
+        ssm = self.FakeSsm()
+        ssm.state_value = json.dumps(
+            {
+                "outage": {"started": "2026-09-15T10:00:00Z", "cause": "unknown"},
+                "interruptions": warnings,
+            }
+        )
+        autoscaling = mock.Mock()
+        autoscaling.describe_auto_scaling_groups.side_effect = RuntimeError("throttled")
+        autoscaling.describe_scaling_activities.side_effect = RuntimeError("throttled")
+        with (
+            mock.patch.object(availability, "ssm", ssm),
+            mock.patch.object(availability, "sns", mock.Mock()),
+            mock.patch.object(availability, "logs", mock.Mock()),
+            mock.patch.object(availability, "autoscaling", autoscaling),
+            mock.patch.object(availability, "edge_metric_series", return_value=[]),
+        ):
+            availability.handle_recovered(
+                {
+                    "state": {"value": "OK", "timestamp": "2026-09-15T10:10:00Z"},
+                    "previousState": {
+                        "value": "ALARM",
+                        "timestamp": "2026-09-15T10:00:00Z",
+                    },
+                }
+            )
+        self.assertEqual(json.loads(ssm.puts[-1]["Value"])["interruptions"], warnings)
 
 
 class UnrecordedRecoveryTests(unittest.TestCase):

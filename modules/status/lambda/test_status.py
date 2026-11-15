@@ -719,7 +719,9 @@ class HostRootVolumeTests(unittest.TestCase):
                     "DesiredCapacity": 1,
                     "MinSize": 1,
                     "MaxSize": 1,
-                    "Instances": [{"InstanceId": "i-main"}],
+                    "Instances": [
+                        {"InstanceId": "i-main", "LifecycleState": "InService"}
+                    ],
                 }
             ]
         }
@@ -731,6 +733,7 @@ class HostRootVolumeTests(unittest.TestCase):
                     {
                         "Instances": [
                             {
+                                "InstanceId": "i-main",
                                 "InstanceType": "t3.small",
                                 "Architecture": "x86_64",
                                 "Placement": {"AvailabilityZone": "us-east-1a"},
@@ -769,7 +772,7 @@ class HostRootVolumeTests(unittest.TestCase):
         ):
             result = status.host()
 
-        self.assertEqual(result["instance"]["root_volume_id"], "vol-root")
+        self.assertEqual(result["instances"][0]["root_volume_id"], "vol-root")
 
     def test_no_block_device_mapping_for_root_device_is_none(self):
         def fake_describe_instances(InstanceIds):
@@ -778,6 +781,7 @@ class HostRootVolumeTests(unittest.TestCase):
                     {
                         "Instances": [
                             {
+                                "InstanceId": "i-main",
                                 "InstanceType": "t3.small",
                                 "Architecture": "x86_64",
                                 "Placement": {"AvailabilityZone": "us-east-1a"},
@@ -812,7 +816,145 @@ class HostRootVolumeTests(unittest.TestCase):
         ):
             result = status.host()
 
-        self.assertIsNone(result["instance"]["root_volume_id"])
+        self.assertIsNone(result["instances"][0]["root_volume_id"])
+
+
+class HostFleetTests(unittest.TestCase):
+    """host() describes every ASG instance in one call, oldest launch first,
+    with the ASG's lifecycle state beside each."""
+
+    def _instance(self, instance_id, instance_type, architecture, launched, ami):
+        return {
+            "InstanceId": instance_id,
+            "InstanceType": instance_type,
+            "Architecture": architecture,
+            "Placement": {"AvailabilityZone": "us-east-1a"},
+            "LaunchTime": launched,
+            "ImageId": ami,
+            "RootDeviceName": "/dev/xvda",
+            "BlockDeviceMappings": [
+                {
+                    "DeviceName": "/dev/xvda",
+                    "Ebs": {"VolumeId": f"vol-{instance_id}"},
+                }
+            ],
+        }
+
+    def test_two_instances_of_different_architectures_sorted_by_launch(self):
+        group = {
+            "AutoScalingGroups": [
+                {
+                    "DesiredCapacity": 2,
+                    "MinSize": 2,
+                    "MaxSize": 2,
+                    "Instances": [
+                        {"InstanceId": "i-new", "LifecycleState": "Pending:Wait"},
+                        {"InstanceId": "i-old", "LifecycleState": "InService"},
+                    ],
+                }
+            ]
+        }
+        described = {
+            "Reservations": [
+                {
+                    "Instances": [
+                        self._instance(
+                            "i-new", "t4g.nano", "arm64", dt(2026, 8, 2), "ami-arm"
+                        )
+                    ]
+                },
+                {
+                    "Instances": [
+                        self._instance(
+                            "i-old", "t3.nano", "x86_64", dt(2026, 8, 1), "ami-x86"
+                        )
+                    ]
+                },
+            ]
+        }
+        with (
+            mock.patch.object(
+                status.autoscaling,
+                "describe_auto_scaling_groups",
+                return_value=group,
+                create=True,
+            ),
+            mock.patch.object(
+                status.ec2, "describe_instances", return_value=described, create=True
+            ) as describe_instances,
+        ):
+            result = status.host()
+
+        describe_instances.assert_called_once()
+        self.assertEqual(
+            sorted(describe_instances.call_args.kwargs["InstanceIds"]),
+            ["i-new", "i-old"],
+        )
+        old, new = result["instances"]
+        self.assertEqual(
+            (old["id"], old["type"], old["architecture"], old["state"]),
+            ("i-old", "t3.nano", "x86_64", "InService"),
+        )
+        self.assertEqual(
+            (new["id"], new["type"], new["architecture"], new["state"]),
+            ("i-new", "t4g.nano", "arm64", "Pending:Wait"),
+        )
+        self.assertEqual(new["root_volume_id"], "vol-i-new")
+
+    def test_equal_launch_times_sort_by_instance_id(self):
+        group = {
+            "AutoScalingGroups": [
+                {
+                    "DesiredCapacity": 2,
+                    "MinSize": 2,
+                    "MaxSize": 2,
+                    "Instances": [
+                        {"InstanceId": "i-b", "LifecycleState": "InService"},
+                        {"InstanceId": "i-a", "LifecycleState": "InService"},
+                    ],
+                }
+            ]
+        }
+        described = {
+            "Reservations": [
+                {
+                    "Instances": [
+                        self._instance(i, "t3.nano", "x86_64", dt(2026, 8, 1), "ami-x")
+                        for i in ("i-b", "i-a")
+                    ]
+                }
+            ]
+        }
+        with (
+            mock.patch.object(
+                status.autoscaling,
+                "describe_auto_scaling_groups",
+                return_value=group,
+                create=True,
+            ),
+            mock.patch.object(
+                status.ec2, "describe_instances", return_value=described, create=True
+            ),
+        ):
+            result = status.host()
+
+        self.assertEqual([i["id"] for i in result["instances"]], ["i-a", "i-b"])
+
+    def test_no_instances_is_an_empty_list(self):
+        group = {
+            "AutoScalingGroups": [
+                {"DesiredCapacity": 0, "MinSize": 0, "MaxSize": 2, "Instances": []}
+            ]
+        }
+        with mock.patch.object(
+            status.autoscaling,
+            "describe_auto_scaling_groups",
+            return_value=group,
+            create=True,
+        ):
+            result = status.host()
+
+        self.assertEqual(result["instances"], [])
 
 
 class StorageTests(unittest.TestCase):
@@ -852,7 +994,7 @@ class StorageTests(unittest.TestCase):
             ),
             mock.patch.object(status, "s3_bucket_metrics", return_value=(0, 0)),
         ):
-            result = status.storage("vol-root")
+            result = status.storage({"i-main": "vol-root"})
 
         self.assertNotIn("volume_error", result)
         roles = [v["role"] for v in result["volumes"]]
@@ -864,6 +1006,39 @@ class StorageTests(unittest.TestCase):
         self.assertEqual(root["id"], "vol-root")
         self.assertEqual(root["device"], "/dev/xvda")
         self.assertFalse(root["encrypted"])
+        self.assertIsNone(data["instance_id"])
+        self.assertEqual(root["instance_id"], "i-main")
+
+    def test_every_instances_root_volume_is_listed_after_the_data_volume(self):
+        def fake_describe_volumes(VolumeIds):
+            self.assertEqual(set(VolumeIds), {"vol-test", "vol-a", "vol-b"})
+            return {
+                "Volumes": [
+                    self._fake_volume("vol-b", "/dev/xvda", 16, False),
+                    self._fake_volume("vol-a", "/dev/xvda", 16, False),
+                    self._fake_volume("vol-test", "/dev/sdf", 20, True),
+                ]
+            }
+
+        with (
+            mock.patch.object(
+                status.ec2,
+                "describe_volumes",
+                side_effect=fake_describe_volumes,
+                create=True,
+            ),
+            mock.patch.object(status, "s3_bucket_metrics", return_value=(0, 0)),
+        ):
+            result = status.storage({"i-old": "vol-a", "i-new": "vol-b"})
+
+        self.assertEqual(
+            [(v["role"], v["instance_id"], v["id"]) for v in result["volumes"]],
+            [
+                ("data", None, "vol-test"),
+                ("root", "i-old", "vol-a"),
+                ("root", "i-new", "vol-b"),
+            ],
+        )
 
     def test_missing_root_volume_id_degrades_to_data_alone(self):
         def fake_describe_volumes(VolumeIds):
@@ -879,7 +1054,7 @@ class StorageTests(unittest.TestCase):
             ),
             mock.patch.object(status, "s3_bucket_metrics", return_value=(0, 0)),
         ):
-            result = status.storage(None)
+            result = status.storage({})
 
         self.assertEqual([v["role"] for v in result["volumes"]], ["data"])
 
@@ -898,7 +1073,7 @@ class StorageTests(unittest.TestCase):
             ),
             mock.patch.object(status, "s3_bucket_metrics", return_value=(0, 0)),
         ):
-            result = status.storage("vol-gone")
+            result = status.storage({"i-main": "vol-gone"})
 
         self.assertEqual([v["role"] for v in result["volumes"]], ["data"])
 
@@ -912,7 +1087,7 @@ class StorageTests(unittest.TestCase):
             ),
             mock.patch.object(status, "s3_bucket_metrics", return_value=(0, 0)),
         ):
-            result = status.storage("vol-root")
+            result = status.storage({"i-main": "vol-root"})
 
         self.assertNotIn("volumes", result)
         self.assertIn("Throttling", result["volume_error"])
@@ -935,7 +1110,7 @@ class StorageTests(unittest.TestCase):
             ),
             mock.patch.object(status, "s3_bucket_metrics", return_value=(0, 0)),
         ):
-            result = status.storage("vol-root")
+            result = status.storage({"i-main": "vol-root"})
 
         self.assertEqual([v["role"] for v in result["volumes"]], ["root"])
 
@@ -947,7 +1122,7 @@ class StorageTests(unittest.TestCase):
             ) as describe_volumes,
             mock.patch.object(status, "s3_bucket_metrics", return_value=(0, 0)),
         ):
-            result = status.storage(None)
+            result = status.storage({})
 
         describe_volumes.assert_not_called()
         self.assertEqual(result["volumes"], [])
@@ -977,7 +1152,7 @@ class CollectStatusIntegrationTests(unittest.TestCase):
             mock.patch.object(status, "reliability", return_value={"ranges": {}}),
             mock.patch.object(status, "incidents", return_value=[]),
             mock.patch.object(
-                status, "host", return_value={"capacity": {}, "instance": None}
+                status, "host", return_value={"capacity": {}, "instances": []}
             ),
             mock.patch.object(
                 status,
@@ -1002,7 +1177,7 @@ class CollectStatusIntegrationTests(unittest.TestCase):
             result = status.collect_status(self.FakeContext())
 
         self.assertNotIn("host_image_storage", result)
-        self.assertEqual(result["host"], {"capacity": {}, "instance": None})
+        self.assertEqual(result["host"], {"capacity": {}, "instances": []})
         self.assertEqual(
             result["image"], {"error": "no running instance to read an AMI from"}
         )
@@ -1252,7 +1427,7 @@ class ReliabilityNowKeysTests(unittest.TestCase):
 
 
 class ImageSourceAmiFallbackTests(unittest.TestCase):
-    """image(ami_id) -- the source AMI description lookup is best-effort;
+    """image(architectures) -- the source AMI description lookup is best-effort;
     Amazon deregistering an old AL2023 source AMI must degrade to the
     build-time source_ami_name tag, not fail the whole panel.
     """
@@ -1263,6 +1438,7 @@ class ImageSourceAmiFallbackTests(unittest.TestCase):
                 return {
                     "Images": [
                         {
+                            "ImageId": "ami-main",
                             "Name": "app-2026-08-09",
                             "CreationDate": "2026-08-09T00:00:00.000Z",
                             "Tags": [
@@ -1285,10 +1461,11 @@ class ImageSourceAmiFallbackTests(unittest.TestCase):
         with mock.patch.object(
             status.ec2, "describe_images", side_effect=fake_describe_images, create=True
         ):
-            result = status.image("ami-main")
+            result = status.image({"ami-main": "x86_64"})["images"][0]
 
         self.assertNotIn("error", result)
         self.assertEqual(result["id"], "ami-main")
+        self.assertEqual(result["architecture"], "x86_64")
         self.assertEqual(result["source_ami"], "ami-deregistered")
         self.assertEqual(result["source_ami_name"], "al2023-ami-2026.07.20")
         self.assertIsNone(result["source_ami_description"])
@@ -1299,6 +1476,7 @@ class ImageSourceAmiFallbackTests(unittest.TestCase):
                 return {
                     "Images": [
                         {
+                            "ImageId": "ami-main",
                             "Name": "n",
                             "CreationDate": "2026-08-09T00:00:00.000Z",
                             "Tags": [
@@ -1324,12 +1502,89 @@ class ImageSourceAmiFallbackTests(unittest.TestCase):
         with mock.patch.object(
             status.ec2, "describe_images", side_effect=fake_describe_images, create=True
         ):
-            result = status.image("ami-main")
+            result = status.image({"ami-main": "x86_64"})["images"][0]
 
         self.assertEqual(
             result["source_ami_description"],
             "Amazon Linux 2023 AMI 2023.12.20260803.3 x86_64 HVM kernel-6.1",
         )
+
+
+class ImageFleetTests(unittest.TestCase):
+    def test_one_batched_call_and_one_entry_per_distinct_ami(self):
+        def fake_describe_images(ImageIds):
+            return {
+                "Images": [
+                    {"ImageId": i, "Name": f"name-{i}", "Tags": []} for i in ImageIds
+                ]
+            }
+
+        with mock.patch.object(
+            status.ec2, "describe_images", side_effect=fake_describe_images, create=True
+        ) as describe_images:
+            result = status.image({"ami-x86": "x86_64", "ami-arm": "arm64"})
+
+        describe_images.assert_called_once_with(ImageIds=["ami-x86", "ami-arm"])
+        self.assertEqual(
+            [(i["id"], i["architecture"], i["name"]) for i in result["images"]],
+            [
+                ("ami-x86", "x86_64", "name-ami-x86"),
+                ("ami-arm", "arm64", "name-ami-arm"),
+            ],
+        )
+
+    def test_an_ami_missing_from_the_result_is_an_error_entry(self):
+        with mock.patch.object(
+            status.ec2,
+            "describe_images",
+            return_value={"Images": [{"ImageId": "ami-x86", "Name": "n", "Tags": []}]},
+            create=True,
+        ):
+            result = status.image({"ami-x86": "x86_64", "ami-arm": "arm64"})
+
+        self.assertEqual(result["images"][0]["id"], "ami-x86")
+        self.assertEqual(result["images"][1], {"error": "AMI ami-arm not found"})
+
+    def test_a_failed_call_raises_for_the_panel_error(self):
+        with (
+            mock.patch.object(
+                status.ec2,
+                "describe_images",
+                side_effect=RuntimeError("boom"),
+                create=True,
+            ),
+            self.assertRaises(RuntimeError),
+        ):
+            status.image({"ami-x86": "x86_64"})
+
+    def test_no_instances_is_an_error(self):
+        self.assertEqual(
+            status.image({}), {"error": "no running instance to read an AMI from"}
+        )
+
+
+class HostImageStorageFleetTests(unittest.TestCase):
+    def test_feeds_each_instances_ami_and_root_volume_through(self):
+        instances = [
+            {"id": "i-1", "ami_id": "ami-x86", "architecture": "x86_64"}
+            | {"root_volume_id": "vol-1"},
+            {"id": "i-2", "ami_id": "ami-x86", "architecture": "x86_64"}
+            | {"root_volume_id": "vol-2"},
+            {"id": "i-3", "ami_id": "ami-arm", "architecture": "arm64"}
+            | {"root_volume_id": None},
+        ]
+        with (
+            mock.patch.object(
+                status, "host", return_value={"capacity": {}, "instances": instances}
+            ),
+            mock.patch.object(status, "image", return_value="img") as image,
+            mock.patch.object(status, "storage", return_value="stor") as storage,
+        ):
+            result = status.host_image_storage()
+
+        image.assert_called_once_with({"ami-x86": "x86_64", "ami-arm": "arm64"})
+        storage.assert_called_once_with({"i-1": "vol-1", "i-2": "vol-2"})
+        self.assertEqual((result["image"], result["storage"]), ("img", "stor"))
 
 
 def _period_of(queries):
@@ -2941,7 +3196,7 @@ class OptionalStorageBucketTests(unittest.TestCase):
             mock.patch.object(status, "EBS_VOLUME_ID", ""),
             mock.patch.object(status, "s3_bucket_metrics") as metrics,
         ):
-            result = status.storage(None)
+            result = status.storage({})
         self.assertNotIn("bucket_size_bytes", result)
         self.assertNotIn("bucket_object_count", result)
         metrics.assert_not_called()

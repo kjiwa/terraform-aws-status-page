@@ -110,9 +110,11 @@ describe('Storage and image panels: absent inputs', () => {
     payload.storage.bucket_object_count = null;
     if (!payload.image || 'error' in payload.image) throw new Error('fixture image');
     delete payload.deployment;
-    payload.image.git_sha = null;
-    payload.image.source_ami_name = null;
-    payload.image.source_ami_description = null;
+    const img = payload.image.images[0];
+    if (!img || 'error' in img) throw new Error('fixture image');
+    img.git_sha = null;
+    img.source_ami_name = null;
+    img.source_ami_description = null;
     const mounted = mountStatus({
       toggles: ALL_TOGGLES_ON,
       tokens: { access: 'test-access-token' },

@@ -24,6 +24,7 @@ iso = base.iso
 BASE = dt(2026, 9, 15, 10, 0, 0)
 OLD_ID = "i-0000000000000001"
 NEW_ID = "i-0000000000000002"
+SURVIVOR_ID = "i-0000000000000003"
 
 CAUSE_UNHEALTHY = "an instance was launched in response to an unhealthy instance needing to be replaced."
 CAUSE_USER_HEALTH = (
@@ -58,6 +59,7 @@ class World:
         self.activities = []
         self.down = (BASE, BASE)
         self.new_launched = BASE
+        self.serving = [NEW_ID]
         self.lifecycle = lifecycle
         self.spot_price = spot_price
         self.spot_price_calls = []
@@ -177,7 +179,16 @@ class World:
                 return {"Activities": seen[:MaxRecords]}
 
             def describe_auto_scaling_groups(self, **_):
-                return {"AutoScalingGroups": [{"Instances": [{"InstanceId": NEW_ID}]}]}
+                return {
+                    "AutoScalingGroups": [
+                        {
+                            "Instances": [
+                                {"InstanceId": i, "LifecycleState": "InService"}
+                                for i in world.serving
+                            ]
+                        }
+                    ]
+                }
 
         return Autoscaling()
 
@@ -186,18 +197,21 @@ class World:
 
         class Ec2:
             def describe_instances(self, InstanceIds):
-                launched = (
-                    world.new_launched if InstanceIds[0] == NEW_ID else at(-86400)
-                )
-                instance = {
-                    "InstanceType": "m8g.medium",
-                    "Placement": {"AvailabilityZone": "us-east-1b"},
-                    "Architecture": "arm64",
-                    "LaunchTime": launched,
-                }
-                if world.lifecycle == "spot":
-                    instance["InstanceLifecycle"] = "spot"
-                return {"Reservations": [{"Instances": [instance]}]}
+                instances = []
+                for instance_id in InstanceIds:
+                    instance = {
+                        "InstanceId": instance_id,
+                        "InstanceType": "m8g.medium",
+                        "Placement": {"AvailabilityZone": "us-east-1b"},
+                        "Architecture": "arm64",
+                        "LaunchTime": (
+                            world.new_launched if instance_id == NEW_ID else at(-86400)
+                        ),
+                    }
+                    if world.lifecycle == "spot":
+                        instance["InstanceLifecycle"] = "spot"
+                    instances.append(instance)
+                return {"Reservations": [{"Instances": instances}]}
 
             def describe_spot_price_history(self, **kwargs):
                 world.spot_price_calls.append(kwargs)
@@ -243,12 +257,12 @@ class World:
             )
         ]
 
-    def warn(self, warned_s):
+    def warn(self, warned_s, instance_id=OLD_ID):
         self.clock = at(warned_s)
         availability.handle_interruption(
             {
                 "time": iso(at(warned_s)),
-                "detail": {"instance-id": OLD_ID, "instance-action": "terminate"},
+                "detail": {"instance-id": instance_id, "instance-action": "terminate"},
             }
         )
 
@@ -295,6 +309,29 @@ class SpotReclaimReplay(ReplayCase):
         self.world.warn(298)
         self.world.replay()
         self.assertEpisode("spot-reclaim", False)
+
+    def test_a_survivors_later_warning_does_not_hide_the_reclaimed_instance(self):
+        self.world.outage(300, 660)
+        self.world.serving = [SURVIVOR_ID, NEW_ID]
+        self.world.warn(298)
+        self.world.warn(330, SURVIVOR_ID)
+        self.world.replay()
+        episode = self.assertEpisode("spot-reclaim", False)
+        self.assertEqual(episode["old_instance"]["id"], OLD_ID)
+        self.assertEqual(episode["new_instance"]["id"], NEW_ID)
+        self.assertEqual(
+            list(json.loads(self.world.state)["interruptions"]), [SURVIVOR_ID]
+        )
+
+    def test_two_warnings_in_one_episode_keep_one_old_instance(self):
+        self.world.outage(300, 660)
+        self.world.warn(298)
+        self.world.warn(330, SURVIVOR_ID)
+        self.world.replay()
+        episode = self.assertEpisode("spot-reclaim", False)
+        self.assertEqual(episode["old_instance"]["id"], SURVIVOR_ID)
+        self.assertEqual(episode["new_instance"]["id"], NEW_ID)
+        self.assertEqual(json.loads(self.world.state)["interruptions"], {})
 
     def test_a_warning_later_than_floored_start(self):
         self.world.outage(300, 660)

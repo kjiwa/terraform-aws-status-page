@@ -152,6 +152,49 @@ export function noRolloutCommitPayload(): GETStatusDataResponse {
 }
 
 /**
+ * The full payload with a second instance: an arm64 t4g.nano launched after the
+ * fixture's x86_64 t3a.medium, mid-handoff (Pending:Wait), on its own AMI and
+ * root volume. Proves Host, Machine image and Storage render one block per
+ * instance, AMI and root volume.
+ */
+export function fleetPayload(): GETStatusDataResponse {
+  const data = structuredClone(fullFixture);
+  const { host, image, storage } = data;
+  if (!host || 'error' in host || !image || 'error' in image || !storage || 'error' in storage) {
+    return data;
+  }
+  const first = host.instances[0];
+  const rootVolume = storage.volumes?.find((v) => v.role === 'root');
+  const firstImage = image.images[0];
+  if (!first || !rootVolume || !firstImage || 'error' in firstImage) return data;
+  host.capacity = { desired: 2, min: 2, max: 2 };
+  host.instances.push({
+    ...first,
+    id: 'i-0a1b2c3d4e5f60718',
+    type: 't4g.nano',
+    architecture: 'arm64',
+    az: 'us-east-1c',
+    state: 'Pending:Wait',
+    launch_time: '2026-06-15T11:50:00Z',
+    uptime_s: 600,
+    ami_id: 'ami-0123456789abcdef0',
+    root_volume_id: 'vol-0f1e2d3c4b5a69788',
+  });
+  image.images.push({
+    ...firstImage,
+    id: 'ami-0123456789abcdef0',
+    architecture: 'arm64',
+    name: 'status-page-base-arm64-459092227',
+  });
+  storage.volumes?.push({
+    ...rootVolume,
+    instance_id: 'i-0a1b2c3d4e5f60718',
+    id: 'vol-0f1e2d3c4b5a69788',
+  });
+  return data;
+}
+
+/**
  * The full payload with three app sections: the fixture's own Release, a
  * Limits section that stresses formatting and wrapping (a large number, a
  * null value, a long unbroken value, a long label), and a PanelError.

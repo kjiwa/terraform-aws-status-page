@@ -15,7 +15,7 @@ import {
 import { useSeries } from '../series';
 import { Card, ErrNote } from '../ui/Card';
 import { Inspector } from '../ui/Inspector';
-import { Kv } from '../ui/Kv';
+import { Kv, type KvValue } from '../ui/Kv';
 import { LegendPair } from '../ui/LegendPair';
 import { RangeSelector } from '../ui/RangeSelector';
 import { WindowNav } from '../ui/WindowNav';
@@ -29,6 +29,24 @@ import { WindowNav } from '../ui/WindowNav';
 function capacityText(cap: { desired: number; min: number; max: number }): string {
   if (cap.min === cap.max) return String(cap.desired);
   return `${cap.desired} (${cap.min}–${cap.max})`;
+}
+
+type Instance = HostData['instances'][number];
+
+// State is the ASG's view and only informs beside a sibling, or when the
+// lone instance is not simply in service.
+function instancePairs(i: Instance, capacity: HostData['capacity'] | null): [string, KvValue][] {
+  const pairs: [string, KvValue][] = [
+    ['ID', i.id],
+    ['Type', i.type],
+    ['Arch', i.architecture],
+    ['AZ', i.az],
+    ['Lifecycle', i.lifecycle],
+  ];
+  if (!capacity || i.state !== 'InService') pairs.push(['State', i.state]);
+  pairs.push(['Launched', fmtDate(i.launch_time)], ['Uptime', fmtDuration(i.uptime_s)]);
+  if (capacity) pairs.push(['Capacity', capacityText(capacity)]);
+  return pairs;
 }
 
 export function Host({
@@ -71,8 +89,8 @@ export function Host({
       </Card>
     );
   }
-  const i = d.instance;
-  if (!i) {
+  const instances = d.instances;
+  if (instances.length === 0) {
     return (
       <Card title="Host">
         <p class="note">No running instance (environment asleep?).</p>
@@ -163,21 +181,18 @@ export function Host({
   return (
     <Card title="Host">
       <div class="subgrid">
-        <div>
-          <h4>Instance</h4>
-          <Kv
-            pairs={[
-              ['ID', i.id],
-              ['Type', i.type],
-              ['Arch', i.architecture],
-              ['AZ', i.az],
-              ['Lifecycle', i.lifecycle],
-              ['Launched', fmtDate(i.launch_time)],
-              ['Uptime', fmtDuration(i.uptime_s)],
-              ['Capacity', d.capacity ? capacityText(d.capacity) : null],
-            ]}
-          />
-        </div>
+        {instances.map((i) => (
+          <div key={i.id}>
+            <h4>{instances.length > 1 ? `Instance ${i.id}` : 'Instance'}</h4>
+            <Kv pairs={instancePairs(i, instances.length === 1 ? d.capacity : null)} />
+          </div>
+        ))}
+        {instances.length > 1 && (
+          <div>
+            <h4>Fleet</h4>
+            <Kv pairs={[['Capacity', capacityText(d.capacity)]]} />
+          </div>
+        )}
         {showChart && (
           <div>
             <h4>CPU & memory</h4>

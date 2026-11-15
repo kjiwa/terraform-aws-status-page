@@ -11,6 +11,7 @@ import { mountStatus } from '../support/mount.ts';
 import { normalizeHtml } from '../support/normalize.ts';
 import {
   degradedPayload,
+  fleetPayload,
   noRolloutCommitPayload,
   payloadFor,
   publicPayload,
@@ -127,6 +128,40 @@ describe('status-render', () => {
     expect(mounted.pageErrors).toEqual([]);
     await expect(normalizeHtml(panelsOf(mounted.document))).toMatchFileSnapshot(
       '__snapshots__/status-render.degraded.html',
+    );
+  });
+
+  it('renders one Host, Machine image and Root volume block per instance', async () => {
+    const mounted = mountStatus({
+      toggles: ALL_TOGGLES_ON,
+      tokens: { access: 'test-access-token' },
+      routes: { data: [{ status: 200, body: fleetPayload() }] },
+    });
+    await mounted.settled();
+    expect(mounted.pageErrors).toEqual([]);
+
+    const headings = [...panelsOf(mounted.document).querySelectorAll('h4')].map(
+      (h) => h.textContent,
+    );
+    expect(headings).toEqual(
+      expect.arrayContaining([
+        'Instance i-04b3f86acd63292d94',
+        'Instance i-0a1b2c3d4e5f60718',
+        'Fleet',
+        'Machine image · x86_64',
+        'Machine image · arm64',
+        'Root volume · i-04b3f86acd63292d94',
+        'Root volume · i-0a1b2c3d4e5f60718',
+      ]),
+    );
+    expect(headings).not.toContain('Instance');
+    const states = [...panelsOf(mounted.document).querySelectorAll('dt')]
+      .filter((t) => t.textContent === 'State')
+      .map((t) => t.nextElementSibling?.textContent);
+    expect(states).toEqual(['in-use', 'in-use', 'in-use', 'InService', 'Pending:Wait']);
+
+    await expect(normalizeHtml(panelsOf(mounted.document))).toMatchFileSnapshot(
+      '__snapshots__/status-render.fleet.html',
     );
   });
 
