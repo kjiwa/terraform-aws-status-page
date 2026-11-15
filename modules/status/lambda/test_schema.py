@@ -229,6 +229,7 @@ def stubbed_aws(**overrides):
                 describe_images=lambda **_: {
                     "Images": [
                         {
+                            "ImageId": "ami-1",
                             "Name": "img",
                             "CreationDate": "2026-01-01T00:00:00.000Z",
                             "Tags": [],

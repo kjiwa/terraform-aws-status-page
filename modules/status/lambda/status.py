@@ -1504,7 +1504,7 @@ def host():
     reservations = ec2.describe_instances(InstanceIds=list(states))["Reservations"]
     described = sorted(
         (i for res in reservations for i in res["Instances"]),
-        key=lambda i: i["LaunchTime"],
+        key=lambda i: (i["LaunchTime"], i["InstanceId"]),
     )
     now = datetime.datetime.now(datetime.UTC)
     return {
@@ -1522,19 +1522,21 @@ def image(architectures):
     """architectures maps each distinct AMI id to its architecture."""
     if not architectures:
         return {"error": "no running instance to read an AMI from"}
+    found = {
+        img["ImageId"]: img
+        for img in ec2.describe_images(ImageIds=list(architectures))["Images"]
+    }
     return {
         "images": [
-            describe_image(ami_id, architecture)
+            describe_image(ami_id, architecture, found.get(ami_id))
             for ami_id, architecture in architectures.items()
         ]
     }
 
 
-def describe_image(ami_id, architecture):
-    images = ec2.describe_images(ImageIds=[ami_id])["Images"]
-    if not images:
+def describe_image(ami_id, architecture, img):
+    if img is None:
         return {"error": f"AMI {ami_id} not found"}
-    img = images[0]
     tags = {t["Key"]: t["Value"] for t in img.get("Tags", [])}
     source_ami = tags.get("source_ami")
 

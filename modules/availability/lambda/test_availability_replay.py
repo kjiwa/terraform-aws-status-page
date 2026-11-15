@@ -197,18 +197,21 @@ class World:
 
         class Ec2:
             def describe_instances(self, InstanceIds):
-                launched = (
-                    world.new_launched if InstanceIds[0] == NEW_ID else at(-86400)
-                )
-                instance = {
-                    "InstanceType": "m8g.medium",
-                    "Placement": {"AvailabilityZone": "us-east-1b"},
-                    "Architecture": "arm64",
-                    "LaunchTime": launched,
-                }
-                if world.lifecycle == "spot":
-                    instance["InstanceLifecycle"] = "spot"
-                return {"Reservations": [{"Instances": [instance]}]}
+                instances = []
+                for instance_id in InstanceIds:
+                    instance = {
+                        "InstanceId": instance_id,
+                        "InstanceType": "m8g.medium",
+                        "Placement": {"AvailabilityZone": "us-east-1b"},
+                        "Architecture": "arm64",
+                        "LaunchTime": (
+                            world.new_launched if instance_id == NEW_ID else at(-86400)
+                        ),
+                    }
+                    if world.lifecycle == "spot":
+                        instance["InstanceLifecycle"] = "spot"
+                    instances.append(instance)
+                return {"Reservations": [{"Instances": instances}]}
 
             def describe_spot_price_history(self, **kwargs):
                 world.spot_price_calls.append(kwargs)

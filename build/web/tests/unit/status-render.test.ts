@@ -145,8 +145,8 @@ describe('status-render', () => {
     );
     expect(headings).toEqual(
       expect.arrayContaining([
-        'Instance 1',
-        'Instance 2',
+        'Instance i-04b3f86acd63292d94',
+        'Instance i-0a1b2c3d4e5f60718',
         'Fleet',
         'Machine image · x86_64',
         'Machine image · arm64',

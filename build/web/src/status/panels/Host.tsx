@@ -181,9 +181,9 @@ export function Host({
   return (
     <Card title="Host">
       <div class="subgrid">
-        {instances.map((i, n) => (
+        {instances.map((i) => (
           <div key={i.id}>
-            <h4>{instances.length > 1 ? `Instance ${n + 1}` : 'Instance'}</h4>
+            <h4>{instances.length > 1 ? `Instance ${i.id}` : 'Instance'}</h4>
             <Kv pairs={instancePairs(i, instances.length === 1 ? d.capacity : null)} />
           </div>
         ))}

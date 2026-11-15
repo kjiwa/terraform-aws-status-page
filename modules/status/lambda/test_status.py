@@ -901,6 +901,45 @@ class HostFleetTests(unittest.TestCase):
         )
         self.assertEqual(new["root_volume_id"], "vol-i-new")
 
+    def test_equal_launch_times_sort_by_instance_id(self):
+        group = {
+            "AutoScalingGroups": [
+                {
+                    "DesiredCapacity": 2,
+                    "MinSize": 2,
+                    "MaxSize": 2,
+                    "Instances": [
+                        {"InstanceId": "i-b", "LifecycleState": "InService"},
+                        {"InstanceId": "i-a", "LifecycleState": "InService"},
+                    ],
+                }
+            ]
+        }
+        described = {
+            "Reservations": [
+                {
+                    "Instances": [
+                        self._instance(i, "t3.nano", "x86_64", dt(2026, 8, 1), "ami-x")
+                        for i in ("i-b", "i-a")
+                    ]
+                }
+            ]
+        }
+        with (
+            mock.patch.object(
+                status.autoscaling,
+                "describe_auto_scaling_groups",
+                return_value=group,
+                create=True,
+            ),
+            mock.patch.object(
+                status.ec2, "describe_instances", return_value=described, create=True
+            ),
+        ):
+            result = status.host()
+
+        self.assertEqual([i["id"] for i in result["instances"]], ["i-a", "i-b"])
+
     def test_no_instances_is_an_empty_list(self):
         group = {
             "AutoScalingGroups": [
@@ -1399,6 +1438,7 @@ class ImageSourceAmiFallbackTests(unittest.TestCase):
                 return {
                     "Images": [
                         {
+                            "ImageId": "ami-main",
                             "Name": "app-2026-08-09",
                             "CreationDate": "2026-08-09T00:00:00.000Z",
                             "Tags": [
@@ -1436,6 +1476,7 @@ class ImageSourceAmiFallbackTests(unittest.TestCase):
                 return {
                     "Images": [
                         {
+                            "ImageId": "ami-main",
                             "Name": "n",
                             "CreationDate": "2026-08-09T00:00:00.000Z",
                             "Tags": [
@@ -1470,15 +1511,20 @@ class ImageSourceAmiFallbackTests(unittest.TestCase):
 
 
 class ImageFleetTests(unittest.TestCase):
-    def test_one_entry_per_distinct_ami_with_its_architecture(self):
+    def test_one_batched_call_and_one_entry_per_distinct_ami(self):
         def fake_describe_images(ImageIds):
-            return {"Images": [{"Name": f"name-{ImageIds[0]}", "Tags": []}]}
+            return {
+                "Images": [
+                    {"ImageId": i, "Name": f"name-{i}", "Tags": []} for i in ImageIds
+                ]
+            }
 
         with mock.patch.object(
             status.ec2, "describe_images", side_effect=fake_describe_images, create=True
-        ):
+        ) as describe_images:
             result = status.image({"ami-x86": "x86_64", "ami-arm": "arm64"})
 
+        describe_images.assert_called_once_with(ImageIds=["ami-x86", "ami-arm"])
         self.assertEqual(
             [(i["id"], i["architecture"], i["name"]) for i in result["images"]],
             [
@@ -1486,6 +1532,30 @@ class ImageFleetTests(unittest.TestCase):
                 ("ami-arm", "arm64", "name-ami-arm"),
             ],
         )
+
+    def test_an_ami_missing_from_the_result_is_an_error_entry(self):
+        with mock.patch.object(
+            status.ec2,
+            "describe_images",
+            return_value={"Images": [{"ImageId": "ami-x86", "Name": "n", "Tags": []}]},
+            create=True,
+        ):
+            result = status.image({"ami-x86": "x86_64", "ami-arm": "arm64"})
+
+        self.assertEqual(result["images"][0]["id"], "ami-x86")
+        self.assertEqual(result["images"][1], {"error": "AMI ami-arm not found"})
+
+    def test_a_failed_call_raises_for_the_panel_error(self):
+        with (
+            mock.patch.object(
+                status.ec2,
+                "describe_images",
+                side_effect=RuntimeError("boom"),
+                create=True,
+            ),
+            self.assertRaises(RuntimeError),
+        ):
+            status.image({"ami-x86": "x86_64"})
 
     def test_no_instances_is_an_error(self):
         self.assertEqual(

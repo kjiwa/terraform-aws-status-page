@@ -6,6 +6,7 @@
 
 - The `/data` payload describes every ASG instance, not one. `host.instance` is now `host.instances` (oldest launch first, each with the ASG `state`, such as `Pending:Wait` during a handoff); `image` is now `{ images: [...] }`, one entry per distinct AMI with its `architecture`; `storage.volumes` lists every instance's root volume, each carrying its `instance_id` (`null` for the data volume). The Host, Machine image and Storage panels render one block per instance, AMI and root volume. A single instance renders as before.
 - `modules/availability` keeps Spot warnings per instance id, so a second warning no longer erases the first, and attributes an outage to the warning of the instance that left the ASG. `current_asg_instance` takes the newest launch, so `new_instance` is the replacement even when a surviving instance is listed first. Episode records still carry one `old_instance` and one `new_instance`.
+- A warned instance still `InService` counts as departed for 5 minutes after its warning, so an alarm firing inside the 2-minute warning window is still attributed to the reclaim. When the ASG lookup fails, the recovery email still names the most recent warning but deletes none. Instance blocks on the Host panel are headed `Instance <id>` when there are several, and instances launched together sort by id.
 
 ### Upgrade
 
