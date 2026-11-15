@@ -108,6 +108,10 @@ MARKER_LAG_S = 15 * 60
 MARKER_LEAD_BEFORE_OUTAGE_S = (-MARKER_FLOOR_S, MARKER_LAG_S)
 MARKER_LEAD_AFTER_APP_STOPPED_S = (-MARKER_LAG_S, MARKER_FLOOR_S)
 
+# A Spot warning older than this can no longer match any outage; dropping it
+# keeps the per-instance markers inside the state parameter's size limit.
+INTERRUPTION_RETENTION_S = 24 * 60 * 60
+
 # Pulled AWS records (deployments, instance refreshes, scaling activities)
 # match from this long before the outage start to the outage end: the cause
 # precedes the first failing probe by the canary/alarm lag, while a
@@ -278,10 +282,19 @@ def backfill(now=None):
 def handle_interruption(event):
     instance_id = event["detail"]["instance-id"]
     info = describe_instance(instance_id)
+    marker = {"time": event["time"], **info}
     state = load_state()
-    state["last_interruption"] = {"time": event["time"], **info}
+    cutoff = parse_ts(event["time"]) - datetime.timedelta(
+        seconds=INTERRUPTION_RETENTION_S
+    )
+    kept = {
+        id_: m
+        for id_, m in state.get("interruptions", {}).items()
+        if parse_ts(m["time"]) >= cutoff
+    }
+    state["interruptions"] = {**kept, instance_id: marker}
     save_state(state)
-    print(json.dumps({"interruption": state["last_interruption"]}))
+    print(json.dumps({"interruption": marker}))
 
 
 # --- change log -----------------------------------------------------------------
@@ -396,7 +409,7 @@ def handle_down(detail):
     now = datetime.datetime.now(datetime.UTC)
     started = first_down(edge_metric_series(alarm_started, now), alarm_started)
     state = load_state()
-    interruption = state.get("last_interruption")
+    interruption = latest_marker(departed_interruptions(state))
 
     cause = classify_cause(started, now, interruption)
 
@@ -444,11 +457,17 @@ def handle_recovered(detail):
     duration_s = int((ended - started).total_seconds())
 
     state.pop("outage")
-    cause = classify_cause(started, ended, state.get("last_interruption"))
+    departed = departed_interruptions(state)
+    interruption = latest_marker(departed)
+    cause = classify_cause(started, ended, interruption)
     planned = cause in PLANNED_CAUSES
-    # Consume the interruption once attributed, so a later unrelated outage
-    # can't be mis-tagged spot-reclaim off this same stale warning.
-    old = state.pop("last_interruption", None) if cause == "spot-reclaim" else None
+    # Consume the departed instances' warnings once attributed, so a later
+    # unrelated outage can't be mis-tagged spot-reclaim off the same stale
+    # warnings. A surviving instance's warning stays.
+    old = interruption if cause == "spot-reclaim" else None
+    if old:
+        for id_ in departed:
+            state["interruptions"].pop(id_)
 
     new = current_asg_instance()
     needed_at = parse_ts(old["time"]) if old and old.get("time") else started
@@ -804,17 +823,44 @@ def spot_price_at(instance):
         return None
 
 
+def asg_instances():
+    r = autoscaling.describe_auto_scaling_groups(AutoScalingGroupNames=[ASG_NAME])
+    return r["AutoScalingGroups"][0]["Instances"]
+
+
 def current_asg_instance():
-    """The ASG's serving instance, or None; a raced terminating instance or a
-    failed lookup leaves the email useful without it.
+    """The ASG's newest launch, which is the replacement when the old instance
+    is still listed, or None; a raced terminating instance or a failed lookup
+    leaves the email useful without it.
     """
 
     def lookup():
-        r = autoscaling.describe_auto_scaling_groups(AutoScalingGroupNames=[ASG_NAME])
-        instances = r["AutoScalingGroups"][0]["Instances"]
-        return describe_instance(instances[0]["InstanceId"]) if instances else None
+        found = [describe_instance(i["InstanceId"]) for i in asg_instances()]
+        return max(found, key=lambda i: parse_ts(i["launched"])) if found else None
 
     return tolerant("current_asg_instance", lookup, None)
+
+
+def departed_interruptions(state):
+    """The state's Spot warnings whose instance is no longer in service in the
+    ASG, by instance id. Every warning when the ASG lookup fails.
+    """
+    interruptions = state.get("interruptions", {})
+
+    def lookup():
+        serving = {
+            i["InstanceId"]
+            for i in asg_instances()
+            if not i["LifecycleState"].startswith("Terminat")
+        }
+        return {id_: m for id_, m in interruptions.items() if id_ not in serving}
+
+    return tolerant("departed_interruptions", lookup, interruptions)
+
+
+def latest_marker(markers):
+    """The most recent of a {instance id: marker} dict, or None when empty."""
+    return max(markers.values(), key=lambda m: parse_ts(m["time"]), default=None)
 
 
 def last_scaling_activity():

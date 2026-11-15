@@ -2,6 +2,7 @@ import type {
   Deployment as DeploymentData,
   DeploymentSummary,
   Image,
+  Images,
   PanelError,
 } from '../../generated/status-payload';
 import { fmtDate } from '../../shared/format';
@@ -52,11 +53,11 @@ function depBlock(label: string, dep: DeploymentSummary, repo: string | null) {
   );
 }
 
-function imageBlock(img: Image | PanelError, repo: string | null, heading = true) {
+function imageBlock(img: Image | PanelError, repo: string | null, title: string | null) {
   if ('error' in img) {
     return (
       <div>
-        {heading && <h4>Machine image</h4>}
+        {title && <h4>{title}</h4>}
         <p class="note">{img.error}</p>
       </div>
     );
@@ -70,7 +71,7 @@ function imageBlock(img: Image | PanelError, repo: string | null, heading = true
   if (base) provenance.push(['Base', base]);
   return (
     <div>
-      {heading && <h4>Machine image</h4>}
+      {title && <h4>{title}</h4>}
       <Kv
         pairs={[
           ['Name', img.name],
@@ -81,6 +82,19 @@ function imageBlock(img: Image | PanelError, repo: string | null, heading = true
       />
     </div>
   );
+}
+
+/** One block per AMI, labelled by architecture once there are several. `titled` is false when the
+ * card itself is already titled "Machine image". */
+function imageBlocks(images: Images | PanelError, repo: string | null, titled: boolean) {
+  const base = titled ? 'Machine image' : null;
+  if ('error' in images) return imageBlock(images, repo, base);
+  const several = images.images.length > 1;
+  return images.images.map((img) => {
+    const arch = 'error' in img ? null : img.architecture;
+    if (!several || !arch) return imageBlock(img, repo, base);
+    return imageBlock(img, repo, base ? `${base} · ${arch}` : arch);
+  });
 }
 
 /** The card is the machine image alone when no CodeDeploy application is configured. */
@@ -94,7 +108,7 @@ export function Deployment({
   repo,
 }: {
   d: DeploymentData | PanelError | undefined;
-  image: Image | PanelError | undefined;
+  image: Images | PanelError | undefined;
   repo: string | null;
 }) {
   if (!d && !image) return null;
@@ -106,7 +120,7 @@ export function Deployment({
     );
   }
   if (!d) {
-    return <Card title={deploymentTitle(d)}>{image && imageBlock(image, repo, false)}</Card>;
+    return <Card title={deploymentTitle(d)}>{image && imageBlocks(image, repo, false)}</Card>;
   }
 
   // Same deployment ID for both: show it once, with a note on the heading,
@@ -129,7 +143,7 @@ export function Deployment({
   return (
     <Card title="Deployment">
       <div class="subgrid">
-        {image && imageBlock(image, repo)}
+        {image && imageBlocks(image, repo, true)}
         {d.ecr_latest_image && (
           <div>
             <h4>Container image</h4>

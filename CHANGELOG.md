@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.8.0
+
+### Changed
+
+- The `/data` payload describes every ASG instance, not one. `host.instance` is now `host.instances` (oldest launch first, each with the ASG `state`, such as `Pending:Wait` during a handoff); `image` is now `{ images: [...] }`, one entry per distinct AMI with its `architecture`; `storage.volumes` lists every instance's root volume, each carrying its `instance_id` (`null` for the data volume). The Host, Machine image and Storage panels render one block per instance, AMI and root volume. A single instance renders as before.
+- `modules/availability` keeps Spot warnings per instance id, so a second warning no longer erases the first, and attributes an outage to the warning of the instance that left the ASG. `current_asg_instance` takes the newest launch, so `new_instance` is the replacement even when a surviving instance is listed first. Episode records still carry one `old_instance` and one `new_instance`.
+
+### Upgrade
+
+- A Spot warning recorded by v0.7.x and not yet attributed is ignored once; the outage it was for is then attributed by the other checks.
+- Consumers reading `host.instance`, `image.id` or the availability state's `last_interruption` must follow the new shape.
+
 ## v0.7.2
 
 ### Changed

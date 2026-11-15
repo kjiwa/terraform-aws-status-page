@@ -182,7 +182,7 @@ export function Storage({
   }
 
   const dataVolume = d.volumes?.find((v) => v.role === 'data');
-  const rootVolume = d.volumes?.find((v) => v.role === 'root');
+  const rootVolumes = d.volumes?.filter((v) => v.role === 'root') ?? [];
   const hasObjectCount = d.bucket_object_count !== null && d.bucket_object_count !== undefined;
   const hasMedia =
     hasObjectCount || (d.bucket_size_bytes !== null && d.bucket_size_bytes !== undefined);
@@ -293,11 +293,21 @@ export function Storage({
             used={byBytes ? usedRow(m, 'data') : null}
           />
         )}
-        <VolumeColumn
-          title="Root volume"
-          v={rootVolume}
-          used={byBytes ? usedRow(m, 'root') : null}
-        />
+        {rootVolumes.length === 0 && (
+          <VolumeColumn
+            title="Root volume"
+            v={undefined}
+            used={byBytes ? usedRow(m, 'root') : null}
+          />
+        )}
+        {rootVolumes.map((v) => (
+          <VolumeColumn
+            key={v.id}
+            title={rootVolumes.length > 1 ? `Root volume · ${v.instance_id}` : 'Root volume'}
+            v={v}
+            used={byBytes && rootVolumes.length === 1 ? usedRow(m, 'root') : null}
+          />
+        ))}
         {hasMedia && (
           <div>
             <h4>Media</h4>
@@ -315,7 +325,7 @@ export function Storage({
           </div>
         )}
       </div>
-      {byBytes && (dataVolume || rootVolume) && (
+      {byBytes && (dataVolume || rootVolumes.length > 0) && (
         <p class="note">
           Size is the volume's raw allocation; Used is against the filesystem's usable capacity,
           which is smaller (ext4 metadata overhead) -- the two numbers describe different things and

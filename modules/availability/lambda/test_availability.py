@@ -498,6 +498,38 @@ class DownPathDegradationTests(unittest.TestCase):
             self.assertIsNone(availability.current_asg_instance())
             self.assertIsNone(availability.last_scaling_activity())
 
+    def test_failed_asg_lookup_treats_every_warning_as_departed(self):
+        autoscaling = mock.Mock()
+        autoscaling.describe_auto_scaling_groups.side_effect = RuntimeError("throttled")
+        interruptions = {"i-1": {"time": "2026-07-15T12:00:00Z"}}
+        with mock.patch.object(availability, "autoscaling", autoscaling):
+            self.assertEqual(
+                availability.departed_interruptions({"interruptions": interruptions}),
+                interruptions,
+            )
+
+    def test_terminating_instance_counts_as_departed(self):
+        autoscaling = mock.Mock()
+        autoscaling.describe_auto_scaling_groups.return_value = {
+            "AutoScalingGroups": [
+                {
+                    "Instances": [
+                        {"InstanceId": "i-1", "LifecycleState": "Terminating"},
+                        {"InstanceId": "i-2", "LifecycleState": "InService"},
+                    ]
+                }
+            ]
+        }
+        interruptions = {
+            "i-1": {"time": "2026-07-15T12:00:00Z"},
+            "i-2": {"time": "2026-07-15T12:00:30Z"},
+        }
+        with mock.patch.object(availability, "autoscaling", autoscaling):
+            departed = availability.departed_interruptions(
+                {"interruptions": interruptions}
+            )
+        self.assertEqual(list(departed), ["i-1"])
+
 
 class UnrecordedRecoveryTests(unittest.TestCase):
     def test_recovery_without_an_open_outage_does_not_claim_a_sleep(self):

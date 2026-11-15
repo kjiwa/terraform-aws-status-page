@@ -1457,6 +1457,34 @@ def interruptions(days=INCIDENTS_LOOKBACK_DAYS, now=None, spot_log=None):
 # --- host -----------------------------------------------------------------------
 
 
+def root_volume_id(inst):
+    """Resolved from RootDeviceName against the describe_instances response
+    host() already holds, so storage() needs no EC2 call to find it."""
+    for bdm in inst.get("BlockDeviceMappings", []):
+        if bdm.get("DeviceName") == inst.get("RootDeviceName"):
+            return bdm.get("Ebs", {}).get("VolumeId")
+    return None
+
+
+def instance_summary(inst, lifecycle_state, now):
+    launch_time = inst["LaunchTime"]
+    return {
+        "id": inst["InstanceId"],
+        "type": inst["InstanceType"],
+        "architecture": inst["Architecture"],
+        "az": inst["Placement"]["AvailabilityZone"],
+        # Absent means on-demand.
+        "lifecycle": inst.get("InstanceLifecycle", "on-demand"),
+        # The ASG's view: shows Pending:Wait while a handoff holds the new
+        # instance.
+        "state": lifecycle_state,
+        "launch_time": iso(launch_time),
+        "uptime_s": int((now - launch_time).total_seconds()),
+        "ami_id": inst["ImageId"],
+        "root_volume_id": root_volume_id(inst),
+    }
+
+
 def host():
     r = autoscaling.describe_auto_scaling_groups(AutoScalingGroupNames=[ASG_NAME])
     groups = r["AutoScalingGroups"]
@@ -1469,50 +1497,40 @@ def host():
         "max": g["MaxSize"],
     }
 
-    instances = g["Instances"]
-    if not instances:
-        return {"capacity": capacity, "instance": None}
+    states = {i["InstanceId"]: i["LifecycleState"] for i in g["Instances"]}
+    if not states:
+        return {"capacity": capacity, "instances": []}
 
-    instance_id = instances[0]["InstanceId"]
-    inst = ec2.describe_instances(InstanceIds=[instance_id])["Reservations"][0][
-        "Instances"
-    ][0]
-    launch_time = inst["LaunchTime"]
+    reservations = ec2.describe_instances(InstanceIds=list(states))["Reservations"]
+    described = sorted(
+        (i for res in reservations for i in res["Instances"]),
+        key=lambda i: i["LaunchTime"],
+    )
     now = datetime.datetime.now(datetime.UTC)
-
-    # The root EBS volume id, resolved from RootDeviceName against this same
-    # describe_instances response -- a host-payload field storage() consumes
-    # (host_image_storage()) the same way image() consumes ami_id, at zero
-    # extra AWS calls.
-    root_volume_id = None
-    for bdm in inst.get("BlockDeviceMappings", []):
-        if bdm.get("DeviceName") == inst.get("RootDeviceName"):
-            root_volume_id = bdm.get("Ebs", {}).get("VolumeId")
-            break
-
     return {
         "capacity": capacity,
-        "instance": {
-            "id": instance_id,
-            "type": inst["InstanceType"],
-            "architecture": inst["Architecture"],
-            "az": inst["Placement"]["AvailabilityZone"],
-            # Absent means on-demand.
-            "lifecycle": inst.get("InstanceLifecycle", "on-demand"),
-            "launch_time": iso(launch_time),
-            "uptime_s": int((now - launch_time).total_seconds()),
-            "ami_id": inst["ImageId"],
-            "root_volume_id": root_volume_id,
-        },
+        "instances": [
+            instance_summary(i, states[i["InstanceId"]], now) for i in described
+        ],
     }
 
 
 # --- image ------------------------------------------------------------------------
 
 
-def image(ami_id):
-    if not ami_id:
+def image(architectures):
+    """architectures maps each distinct AMI id to its architecture."""
+    if not architectures:
         return {"error": "no running instance to read an AMI from"}
+    return {
+        "images": [
+            describe_image(ami_id, architecture)
+            for ami_id, architecture in architectures.items()
+        ]
+    }
+
+
+def describe_image(ami_id, architecture):
     images = ec2.describe_images(ImageIds=[ami_id])["Images"]
     if not images:
         return {"error": f"AMI {ami_id} not found"}
@@ -1539,6 +1557,7 @@ def image(ami_id):
 
     return {
         "id": ami_id,
+        "architecture": architecture,
         "name": img.get("Name"),
         "creation_date": img.get("CreationDate"),
         "git_sha": tags.get("git_sha"),
@@ -1550,22 +1569,22 @@ def image(ami_id):
 
 def host_image_storage():
     """host(), image(), and storage() as one thread-pool branch, run
-    sequentially: image() needs host()'s ami_id and storage() needs host()'s
-    root_volume_id. Each third still isolates its own failure through
+    sequentially: image() needs host()'s AMIs and storage() needs host()'s
+    root volumes. Each third still isolates its own failure through
     safe_section, so a host error doesn't blank the other two -- image()
     degrades to its own "no running instance" message, storage() degrades to
-    the data volume alone (root_volume_id is None).
+    the data volume alone (no root volumes).
     """
     host_info = safe_section("host", host)
-    ami_id = None
-    root_volume_id = None
-    if isinstance(host_info, dict) and host_info.get("instance"):
-        ami_id = host_info["instance"].get("ami_id")
-        root_volume_id = host_info["instance"].get("root_volume_id")
+    instances = host_info.get("instances", []) if isinstance(host_info, dict) else []
+    architectures = {i["ami_id"]: i["architecture"] for i in instances}
+    root_volumes = {
+        i["id"]: i["root_volume_id"] for i in instances if i["root_volume_id"]
+    }
     return {
         "host": host_info,
-        "image": safe_section("image", image, ami_id),
-        "storage": safe_section("storage", storage, root_volume_id),
+        "image": safe_section("image", image, architectures),
+        "storage": safe_section("storage", storage, root_volumes),
     }
 
 
@@ -1717,30 +1736,32 @@ def summarize_deployment(d, commits):
 # --- storage ------------------------------------------------------------------------
 
 
-def storage(root_volume_id):
-    """root_volume_id comes from host()'s own describe_instances response
-    (host_image_storage() passes it through), so this needs no separate EC2
-    call to find it. A missing root id -- no running instance, or host()
-    itself errored -- degrades to the data volume alone, same as a root id
-    that describe_volumes doesn't return (e.g. mid-swap).
+def storage(root_volumes):
+    """root_volumes maps instance id to root volume id, from host()'s own
+    describe_instances response (host_image_storage() passes it through), so
+    this needs no separate EC2 call to find them. No root volumes -- no
+    running instance, or host() itself errored -- degrades to the data volume
+    alone, as does a root id that describe_volumes doesn't return (e.g.
+    mid-swap).
     """
     result = {}
     try:
-        volume_ids = ([EBS_VOLUME_ID] if EBS_VOLUME_ID else []) + (
-            [root_volume_id] if root_volume_id else []
-        )
+        owners = ([(None, "data", EBS_VOLUME_ID)] if EBS_VOLUME_ID else []) + [
+            (instance_id, "root", volume_id)
+            for instance_id, volume_id in root_volumes.items()
+        ]
         volumes_by_id = (
             {
                 v["VolumeId"]: v
-                for v in ec2.describe_volumes(VolumeIds=volume_ids)["Volumes"]
+                for v in ec2.describe_volumes(VolumeIds=[o[2] for o in owners])[
+                    "Volumes"
+                ]
             }
-            if volume_ids
+            if owners
             else {}
         )
         volumes = []
-        for role, volume_id in (("data", EBS_VOLUME_ID), ("root", root_volume_id)):
-            if not volume_id:
-                continue
+        for instance_id, role, volume_id in owners:
             v = volumes_by_id.get(volume_id)
             if not v:
                 continue
@@ -1748,6 +1769,7 @@ def storage(root_volume_id):
             volumes.append(
                 {
                     "role": role,
+                    "instance_id": instance_id,
                     "id": volume_id,
                     "device": attachments[0].get("Device") if attachments else None,
                     "size_gb": v.get("Size"),

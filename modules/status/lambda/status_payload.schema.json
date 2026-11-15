@@ -96,7 +96,7 @@
     "image": {
       "oneOf": [
         {
-          "$ref": "#/$defs/Image"
+          "$ref": "#/$defs/Images"
         },
         {
           "$ref": "#/$defs/PanelError"
@@ -582,7 +582,7 @@
       "additionalProperties": false,
       "required": [
         "capacity",
-        "instance"
+        "instances"
       ],
       "properties": {
         "capacity": {
@@ -605,60 +605,60 @@
             }
           }
         },
-        "instance": {
-          "oneOf": [
-            {
-              "type": "object",
-              "additionalProperties": false,
-              "required": [
-                "id",
-                "type",
-                "architecture",
-                "az",
-                "lifecycle",
-                "launch_time",
-                "uptime_s",
-                "ami_id",
-                "root_volume_id"
-              ],
-              "properties": {
-                "id": {
-                  "type": "string"
-                },
-                "type": {
-                  "type": "string"
-                },
-                "architecture": {
-                  "type": "string"
-                },
-                "az": {
-                  "type": "string"
-                },
-                "lifecycle": {
-                  "type": "string"
-                },
-                "launch_time": {
-                  "type": "string"
-                },
-                "uptime_s": {
-                  "type": "integer",
-                  "minimum": 0
-                },
-                "ami_id": {
-                  "type": "string"
-                },
-                "root_volume_id": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                }
+        "instances": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "type",
+              "architecture",
+              "az",
+              "lifecycle",
+              "state",
+              "launch_time",
+              "uptime_s",
+              "ami_id",
+              "root_volume_id"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              },
+              "architecture": {
+                "type": "string"
+              },
+              "az": {
+                "type": "string"
+              },
+              "lifecycle": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string"
+              },
+              "launch_time": {
+                "type": "string"
+              },
+              "uptime_s": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "ami_id": {
+                "type": "string"
+              },
+              "root_volume_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
               }
-            },
-            {
-              "type": "null"
             }
-          ]
+          }
         }
       }
     },
@@ -667,6 +667,7 @@
       "additionalProperties": false,
       "required": [
         "id",
+        "architecture",
         "name",
         "creation_date",
         "git_sha",
@@ -676,6 +677,9 @@
       ],
       "properties": {
         "id": {
+          "type": "string"
+        },
+        "architecture": {
           "type": "string"
         },
         "name": {
@@ -716,11 +720,34 @@
         }
       }
     },
+    "Images": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "images"
+      ],
+      "properties": {
+        "images": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/Image"
+              },
+              {
+                "$ref": "#/$defs/PanelError"
+              }
+            ]
+          }
+        }
+      }
+    },
     "Volume": {
       "type": "object",
       "additionalProperties": false,
       "required": [
         "role",
+        "instance_id",
         "id",
         "device",
         "size_gb",
@@ -734,6 +761,12 @@
           "enum": [
             "data",
             "root"
+          ]
+        },
+        "instance_id": {
+          "type": [
+            "string",
+            "null"
           ]
         },
         "id": {

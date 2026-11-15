@@ -3556,31 +3556,40 @@
       "min": 1,
       "max": 1
     },
-    "instance": {
-      "id": "i-04b3f86acd63292d94",
-      "type": "t3a.medium",
-      "architecture": "x86_64",
-      "az": "us-east-1b",
-      "lifecycle": "spot",
-      "launch_time": "2026-06-15T06:00:00Z",
-      "uptime_s": 21600,
-      "ami_id": "ami-00a4fba52bef03327d",
-      "root_volume_id": "vol-0255bebb510403ba78"
-    }
+    "instances": [
+      {
+        "id": "i-04b3f86acd63292d94",
+        "type": "t3a.medium",
+        "architecture": "x86_64",
+        "az": "us-east-1b",
+        "lifecycle": "spot",
+        "state": "InService",
+        "launch_time": "2026-06-15T06:00:00Z",
+        "uptime_s": 21600,
+        "ami_id": "ami-00a4fba52bef03327d",
+        "root_volume_id": "vol-0255bebb510403ba78"
+      }
+    ]
   },
   "image": {
-    "id": "ami-00a4fba52bef03327d",
-    "name": "status-page-base-x86-459092227",
-    "creation_date": "2026-06-06T12:00:00Z",
-    "git_sha": "9c2dc1a2fd447d3e735ea1108dbfdde0d043672e",
-    "source_ami": null,
-    "source_ami_name": "al2023-ami-minimal",
-    "source_ami_description": "Amazon Linux 2023 minimal image (synthetic fixture value)"
+    "images": [
+      {
+        "id": "ami-00a4fba52bef03327d",
+        "architecture": "x86_64",
+        "name": "status-page-base-x86-459092227",
+        "creation_date": "2026-06-06T12:00:00Z",
+        "git_sha": "9c2dc1a2fd447d3e735ea1108dbfdde0d043672e",
+        "source_ami": null,
+        "source_ami_name": "al2023-ami-minimal",
+        "source_ami_description": "Amazon Linux 2023 minimal image (synthetic fixture value)"
+      }
+    ]
   },
   "storage": {
     "volumes": [
       {
         "role": "data",
+        "instance_id": null,
         "id": "vol-0b5d058cfa241aa04e",
         "device": "/dev/sdf",
         "size_gb": 20,
@@ -3591,6 +3600,7 @@
       },
       {
         "role": "root",
+        "instance_id": "i-04b3f86acd63292d94",
         "id": "vol-0255bebb510403ba78",
         "device": "/dev/xvda",
         "size_gb": 16,
