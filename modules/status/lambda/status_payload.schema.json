@@ -1210,7 +1210,7 @@
       }
     },
     "HostMetrics": {
-      "description": "Per HOST_METRIC_SPECS key, either a HostMetricSeries or a `<key>_error` string -- host_metrics()'s own per-metric error isolation. disk_used_percent is mutually exclusive with the four disk_*_bytes_* keys: VOLUME_METRICS_ENABLED picks which arm HOST_METRIC_SPECS carries, and the publisher (build/ami/health-watchdog.sh) only ever emits the matching series.",
+      "description": "Per HOST_METRIC_SPECS key, either a HostMetricSeries or a `<key>_error` string -- host_metrics()'s own per-metric error isolation. disk_used_percent is mutually exclusive with the four disk_*_bytes_* keys: VOLUME_METRICS_ENABLED picks which arm HOST_METRIC_SPECS carries, and the host's publisher only ever emits the matching series.",
       "type": "object",
       "additionalProperties": false,
       "properties": {
