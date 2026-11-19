@@ -35,12 +35,12 @@ episode's cause never depends on what was visible when the alarm fired:
 
   1. spot-reclaim     -- an EC2 Spot Interruption Warning (source #2 above)
                          landed shortly before the outage started.
-  2. rightsize        -- build/ami/rightsize-watchdog.sh wrote its marker to a
+  2. rightsize        -- the host's rightsize watchdog wrote its marker to a
                          dedicated SSM parameter while replacing the instance.
-  3. health-watchdog  -- same idea: build/ami/health-watchdog.sh's
-                         set_unhealthy() writes its marker while marking the
-                         instance Unhealthy over a dead app.
-  4. backup           -- scripts/backup.sh snapshot wrote its marker just
+  3. health-watchdog  -- same idea: the host's health watchdog writes its
+                         marker while marking the instance Unhealthy over a
+                         dead app.
+  4. backup           -- the host's backup snapshot wrote its marker just
                          before stopping the app.
   5. deploy           -- pulled, not pushed: a CodeDeploy deployment created by
                          a person or a rollback (DELIBERATE_DEPLOYMENT_CREATORS)
