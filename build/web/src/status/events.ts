@@ -35,6 +35,31 @@ export function cellIncidents(w: StripWindow, index: number, episodes: Episode[]
   });
 }
 
+/**
+ * Median duration of the episodes that started within `days` of `nowMs`
+ * (planned ones only when `includePlanned`); null with none, so a caller
+ * never shows a median of nothing.
+ */
+export function medianRecovery(
+  episodes: Episode[],
+  nowMs: number,
+  days: number,
+  includePlanned: boolean,
+): { seconds: number; count: number } | null {
+  const since = nowMs - days * 86400_000;
+  const durations = episodes
+    .filter((ep) => Date.parse(ep.started) >= since && (includePlanned || !ep.planned))
+    .map((ep) => ep.duration_s)
+    .sort((a, b) => a - b);
+  if (durations.length === 0) return null;
+  const mid = Math.floor(durations.length / 2);
+  const seconds =
+    durations.length % 2
+      ? (durations[mid] ?? 0)
+      : Math.round(((durations[mid - 1] ?? 0) + (durations[mid] ?? 0)) / 2);
+  return { seconds, count: durations.length };
+}
+
 /** "2 incidents: spot-reclaim 5m 0s, deploy 1m 0s"; the first few named, the rest counted. */
 export function incidentsText(episodes: Episode[]): string {
   if (episodes.length === 0) return '';

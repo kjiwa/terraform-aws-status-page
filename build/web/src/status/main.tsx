@@ -59,8 +59,6 @@ function applyConfig(cfg: StatusConfig): void {
   const heading = document.getElementById('title');
   if (heading) heading.textContent = cfg.title;
   hideDisabledSkeletons(cfg.disabledPanels);
-  const surface = getComputedStyle(document.body).backgroundColor;
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', surface);
 }
 
 async function boot(): Promise<void> {

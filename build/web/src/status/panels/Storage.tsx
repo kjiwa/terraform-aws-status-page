@@ -10,6 +10,7 @@ import { fmtBool, fmtBytes, fmtPct } from '../../shared/format';
 import type { ChartSeries } from '../charts/LineChart';
 import { LineChart } from '../charts/LineChart';
 import { useResettableIndex } from '../inspect';
+import { volumeStateLabel } from '../labels';
 import {
   availableRanges,
   defaultSelected,
@@ -20,6 +21,7 @@ import {
 import { useSeries } from '../series';
 import { Bar } from '../ui/Bar';
 import { Card, ErrNote } from '../ui/Card';
+import { Identifiers } from '../ui/Identifiers';
 import { Inspector } from '../ui/Inspector';
 import { Kv, type KvValue } from '../ui/Kv';
 import { LegendPair } from '../ui/LegendPair';
@@ -110,18 +112,29 @@ function VolumeColumn({
   used: string | null;
 }) {
   const pairs: [string, KvValue][] = [
-    ['ID', v ? v.id : null],
     ['Size', v ? `${v.size_gb} GiB` : null],
     ['Type', v ? v.type : null],
     ['IOPS', v ? v.iops : null],
     ['Encrypted', v ? fmtBool(v.encrypted) : null],
-    ['State', v ? v.state : null],
+    ['State', v?.state ? volumeStateLabel(v.state) : null],
   ];
   if (used) pairs.push(['Used', used]);
   return (
     <div>
       <h4>{title}</h4>
       <Kv pairs={pairs} />
+      {v && (
+        <Identifiers
+          pairs={
+            v.instance_id
+              ? [
+                  ['Volume ID', v.id],
+                  ['Instance ID', v.instance_id],
+                ]
+              : [['Volume ID', v.id]]
+          }
+        />
+      )}
     </div>
   );
 }
@@ -300,10 +313,10 @@ export function Storage({
             used={byBytes ? usedRow(m, 'root') : null}
           />
         )}
-        {rootVolumes.map((v) => (
+        {rootVolumes.map((v, n) => (
           <VolumeColumn
             key={v.id}
-            title={rootVolumes.length > 1 ? `Root volume · ${v.instance_id}` : 'Root volume'}
+            title={rootVolumes.length > 1 ? `Root volume ${n + 1}` : 'Root volume'}
             v={v}
             used={byBytes && rootVolumes.length === 1 ? usedRow(m, 'root') : null}
           />

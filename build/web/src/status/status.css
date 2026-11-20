@@ -2,17 +2,17 @@
   /* Accent and its on-color; main.tsx overrides both when the config's
      theme() supplies a primary color. */
   color-scheme: light dark;
-  --sp-secondary: #0277bd;
-  --sp-on-secondary: #fff;
-  --sp-surface: #ffffff;
-  --sp-card: #f7f7f7;
-  --sp-on-surface: #1b1b1b;
-  --sp-muted: #5f5f5f;
-  --sp-border: rgba(0, 0, 0, 0.12);
-  --sp-good: #2e7d32;
-  --sp-warn: #b58900;
-  --sp-bad: #c62828;
-  --sp-gray: #bdbdbd;
+  --sp-secondary: light-dark(#0272b5, #64b5f6);
+  --sp-on-secondary: light-dark(#ffffff, #141414);
+  --sp-surface: light-dark(#ffffff, #141414);
+  --sp-card: light-dark(#f7f7f7, #1f1f1f);
+  --sp-on-surface: light-dark(#1b1b1b, #e8e8e8);
+  --sp-muted: light-dark(#5f5f5f, #a9a9a9);
+  --sp-border: light-dark(rgba(0, 0, 0, 0.12), rgba(255, 255, 255, 0.14));
+  --sp-good: light-dark(#2e7d32, #66bb6a);
+  --sp-warn: light-dark(#b38700, #ffca28);
+  --sp-bad: light-dark(#c62828, #ef5350);
+  --sp-gray: light-dark(#bdbdbd, #555555);
   /* Chart/meter line and fill colors -- deliberately distinct from
      --sp-good/warn/bad above, which mean SLO bands specifically and would
      misread as "this line is healthy/unhealthy" if reused for a plain
@@ -27,11 +27,11 @@
      --sp-chart-track is the unfilled portion of a meter bar: a low-alpha
      tint of --sp-chart-1 rather than a separate hue, so a bar reads as
      "this much of the same thing" instead of two unrelated colors. */
-  --sp-chart-1: #2a78d6;
-  --sp-chart-2: #eb6834;
-  --sp-chart-3: #1baf7a;
-  --sp-chart-2-tint: #f6b08f;
-  --sp-chart-track: rgba(42, 120, 214, 0.15);
+  --sp-chart-1: light-dark(#2a78d6, #3987e5);
+  --sp-chart-2: light-dark(#eb6834, #d95926);
+  --sp-chart-3: light-dark(#1baf7a, #199e70);
+  --sp-chart-2-tint: light-dark(#f6b08f, #f8a47d);
+  --sp-chart-track: light-dark(rgba(42, 120, 214, 0.15), rgba(57, 135, 229, 0.28));
   /* Spacing and type scale -- every margin/gap/padding and font-size on
      the page snaps to one of these rather than its own literal, so two
      visually-equal gaps (e.g. a card's internal padding and the space
@@ -63,6 +63,8 @@
      wraps rather than breaking anything. Desktop (above 40rem) reverts
      to per-instance max-content -- see that media query for why. */
   --sp-kv-label-w: 8rem;
+  /* Smallest interactive target (WCAG 2.5.5 / platform guidelines). */
+  --sp-touch-min: 44px;
 }
 /* UA default margins on these would otherwise silently outcompete every
    spacing rule below that assumes it owns the gap between two elements
@@ -77,49 +79,14 @@ h4,
 dl {
   margin: 0;
 }
-/* Dark ramp: the @media branch covers "system" (no explicit choice, so an
-   unset data-theme falls through to the OS), and the attribute branch
-   covers an explicit dark choice regardless of OS. The block is
-   duplicated across the two selectors rather than shared -- CSS has no
-   "OR" between a media feature and an attribute selector to merge them
-   into one ruleset. */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
-    --sp-surface: #141414;
-    --sp-card: #1f1f1f;
-    --sp-on-surface: #e8e8e8;
-    --sp-muted: #a9a9a9;
-    --sp-border: rgba(255, 255, 255, 0.14);
-    --sp-good: #66bb6a;
-    --sp-warn: #ffca28;
-    --sp-bad: #ef5350;
-    --sp-gray: #555555;
-    --sp-chart-1: #3987e5;
-    --sp-chart-2: #d95926;
-    --sp-chart-3: #199e70;
-    --sp-chart-2-tint: #f8a47d;
-    --sp-chart-track: rgba(57, 135, 229, 0.28);
-  }
-}
+/* Every light-dark() token above resolves by the root's color-scheme: `light
+   dark` follows the OS, and an explicit choice pins one side regardless of
+   the OS. */
 :root[data-theme='light'] {
   color-scheme: light;
 }
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --sp-surface: #141414;
-  --sp-card: #1f1f1f;
-  --sp-on-surface: #e8e8e8;
-  --sp-muted: #a9a9a9;
-  --sp-border: rgba(255, 255, 255, 0.14);
-  --sp-good: #66bb6a;
-  --sp-warn: #ffca28;
-  --sp-bad: #ef5350;
-  --sp-gray: #555555;
-  --sp-chart-1: #3987e5;
-  --sp-chart-2: #d95926;
-  --sp-chart-3: #199e70;
-  --sp-chart-2-tint: #f8a47d;
-  --sp-chart-track: rgba(57, 135, 229, 0.28);
 }
 * {
   box-sizing: border-box;
@@ -160,7 +127,9 @@ a {
   color: var(--sp-secondary);
 }
 .btn {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--sp-touch-min);
   margin-top: var(--sp-space-4);
   padding: 0.55rem 1.1rem;
   border-radius: 0.4rem;
@@ -218,6 +187,7 @@ a {
   color: var(--sp-on-surface);
   border-radius: 0.3rem;
   padding: var(--sp-space-1) var(--sp-space-3);
+  min-height: var(--sp-touch-min);
   font-size: var(--sp-text-sm);
   cursor: pointer;
 }
@@ -323,6 +293,8 @@ a {
   color: var(--sp-on-surface);
   border-radius: 0.3rem;
   padding: var(--sp-space-1) var(--sp-space-3);
+  min-width: var(--sp-touch-min);
+  min-height: var(--sp-touch-min);
   font-size: var(--sp-text-sm);
   cursor: pointer;
 }
@@ -362,6 +334,8 @@ a:focus-visible,
   color: var(--sp-on-surface);
   border-radius: 0.3rem;
   padding: var(--sp-space-1) var(--sp-space-2);
+  min-width: var(--sp-touch-min);
+  min-height: var(--sp-touch-min);
   font-size: var(--sp-text-sm);
   cursor: pointer;
 }
@@ -649,6 +623,9 @@ details {
   margin-top: var(--sp-space-2);
 }
 details > summary {
+  display: flex;
+  align-items: center;
+  min-height: var(--sp-touch-min);
   cursor: pointer;
   list-style: none;
 }

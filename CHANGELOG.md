@@ -1,5 +1,26 @@
 # Changelog
 
+## v0.9.0
+
+### Added
+
+- The Machine image block shows the image's age, and "A newer image is adopted at the next replacement." when the ASG's launch templates (each mixed-instances override's own) name a different AMI than the running one. `image.images[]` gains optional `age_days` and `newer_image_pending`; the latter is `null` when a template cannot be resolved to an AMI id (an SSM parameter reference, a failed lookup).
+- The Reliability panel shows "Median recovery, last 30 days" over episodes that started in that window, following the all/unplanned toggle, and is absent when none did.
+- Captions name scope: CPU averages across the group's instances, memory averages what the instances report, Cost is account-wide through yesterday (UTC).
+- Tests: an axe scan per theme at 393 and 1280 (`@axe-core/playwright`), a 44px touch-target check, per-scheme `theme-color`, and overflow checks at 393 and 1280 with every toggle on and off.
+
+### Changed
+
+- Dark colors are `light-dark()` values in one `:root` block; `data-theme` only sets `color-scheme`. Two `theme-color` metas, one per scheme, follow the page background, and the explicit scheme when one is chosen.
+- Buttons, the sign-in link and disclosure summaries are at least 44px (`--sp-touch-min`).
+- Default accent is `#0272b5` light and `#64b5f6` dark (links failed 4.5:1 on cards); default `--sp-warn` is `#b38700` in light (was 2.996:1 against the card, now 3.07:1).
+- The page content sits in a `<main>`; the loading skeleton is `aria-busy`.
+- Lifecycle and state enums read in words. Instance, AMI and volume ids sit in a closed "Identifiers" disclosure; several instances are headed `Instance 1`, `Instance 2`, and root volumes `Root volume 1`, `Root volume 2`.
+
+### Upgrade
+
+- The status Lambda role gains `ec2:DescribeLaunchTemplateVersions` (read-only, no resource scoping). Consumers pick it up by bumping `?ref=v0.9.0`; without the grant the new fields are `null` and nothing else changes.
+
 ## v0.8.0
 
 ### Changed

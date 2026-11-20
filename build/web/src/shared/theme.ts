@@ -51,6 +51,28 @@ export function safeTheme(theme: () => ThemeChoice): ThemeChoice {
   }
 }
 
+/**
+ * Points each theme-color meta at the page background it will sit over: the
+ * explicit scheme when one is set, otherwise the scheme the meta's own media
+ * query names. Each read pins data-theme for the moment: Chromium resolves
+ * light-dark() inside a custom property from the stylesheet's color-scheme,
+ * and ignores an inline one.
+ */
+function syncThemeColor(root: HTMLElement): void {
+  const chosen = root.getAttribute('data-theme');
+  for (const meta of root.ownerDocument.querySelectorAll<HTMLMetaElement>(
+    'meta[name="theme-color"][media]',
+  )) {
+    root.setAttribute(
+      'data-theme',
+      chosen ?? (meta.getAttribute('media')?.includes('dark') ? 'dark' : 'light'),
+    );
+    meta.content = getComputedStyle(root).backgroundColor;
+  }
+  if (chosen === null) root.removeAttribute('data-theme');
+  else root.setAttribute('data-theme', chosen);
+}
+
 export function applyTheme(root: HTMLElement, choice: ThemeChoice): void {
   if (choice.scheme) root.setAttribute('data-theme', choice.scheme);
   if (choice.primary) {
@@ -60,4 +82,5 @@ export function applyTheme(root: HTMLElement, choice: ThemeChoice): void {
   for (const [name, value] of Object.entries(choice.tokens ?? {})) {
     root.style.setProperty(`--sp-${name}`, value);
   }
+  syncThemeColor(root);
 }

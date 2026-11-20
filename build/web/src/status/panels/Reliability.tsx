@@ -8,7 +8,7 @@ import type {
 } from '../../generated/status-payload';
 import { fmtDuration, fmtPct, fmtThreshold } from '../../shared/format';
 import { LineChart } from '../charts/LineChart';
-import { cellIncidents, incidentsText, stripWindow } from '../events';
+import { cellIncidents, incidentsText, medianRecovery, stripWindow } from '../events';
 import { useInspector, useResettableIndex } from '../inspect';
 import { availableRanges, defaultSelected, RANGE_ORDER, type RangeKey } from '../ranges';
 import { useSeries } from '../series';
@@ -16,6 +16,7 @@ import { Card, ErrNote } from '../ui/Card';
 import { Inspector } from '../ui/Inspector';
 import { LegendPair } from '../ui/LegendPair';
 import { RangeSelector } from '../ui/RangeSelector';
+import { Kv } from '../ui/Kv';
 import { StatRow } from '../ui/StatRow';
 import { ToggleGroup } from '../ui/ToggleGroup';
 import { WindowNav } from '../ui/WindowNav';
@@ -33,6 +34,8 @@ import { WindowNav } from '../ui/WindowNav';
 // the legend -- identically without hardcoding the same numbers twice.
 const SLO_GOOD_FALLBACK = 0.999;
 const SLO_WARN_FALLBACK = 0.95;
+
+const RECOVERY_DAYS = 30;
 
 const COUNTING: [string, string][] = [
   ['all', 'All outages'],
@@ -130,6 +133,8 @@ export function Reliability({
   canPan?: boolean;
 }) {
   const [counting, setCounting] = useState<'all' | 'unplanned'>('all');
+  // Read once at mount, as WindowNav does: render must not call the clock.
+  const [mountedAtMs] = useState(() => Date.now());
   // The panned window's own end, null at rest -- see series.ts's
   // useSeries(). Independent of `counting`: panning the strip has no bearing
   // on which downtime is counted.
@@ -183,6 +188,10 @@ export function Reliability({
     return [fmtPct(v, decimals), key, title];
   });
 
+  const recovery = Array.isArray(episodes)
+    ? medianRecovery(episodes, mountedAtMs, RECOVERY_DAYS, counting === 'all')
+    : null;
+
   const lat = r?.latency;
   const probe = lat?.probe || [];
   const hasLatency = seriesHasData(probe);
@@ -230,6 +239,20 @@ export function Reliability({
           aria-pressed on the buttons alone would not announce. */}
       <div aria-live="polite">
         <StatRow items={tiles} />
+        {recovery && (
+          <>
+            <Kv
+              pairs={[
+                [`Median recovery, last ${RECOVERY_DAYS} days`, fmtDuration(recovery.seconds)],
+              ]}
+            />
+            <p class="note">
+              Median outage duration across {recovery.count}{' '}
+              {recovery.count === 1 ? 'outage' : 'outages'} that started in the last {RECOVERY_DAYS}{' '}
+              days{counting === 'unplanned' ? ', planned outages excluded' : ''}.
+            </p>
+          </>
+        )}
       </div>
 
       {/* The selector governs the strip and latency chart below it, not
