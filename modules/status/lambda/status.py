@@ -1554,7 +1554,8 @@ def target_image_ids():
             AutoScalingGroupNames=[ASG_NAME]
         )["AutoScalingGroups"]
         specs = launch_template_specs(groups[0]) if groups else []
-        ids = {template_image_id(spec) for spec in specs}
+        distinct = {tuple(sorted(spec.items())): spec for spec in specs}.values()
+        ids = {template_image_id(spec) for spec in distinct}
     except Exception as e:
         print(json.dumps({"launch_template_lookup_failed": f"{type(e).__name__}: {e}"}))
         return None
@@ -1584,8 +1585,11 @@ def image(architectures, now=None):
 def image_age_days(creation_date, now):
     if not creation_date:
         return None
-    created = datetime.datetime.fromisoformat(creation_date)
-    return max(0, (now - created).days)
+    try:
+        created = datetime.datetime.fromisoformat(creation_date)
+        return max(0, (now - created).days)
+    except (TypeError, ValueError):
+        return None
 
 
 def describe_image(ami_id, architecture, img, targets, now):

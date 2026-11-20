@@ -1701,6 +1701,41 @@ class ImageAgeAndPendingTests(unittest.TestCase):
         result = status.describe_image("ami-old", "x86_64", img, None, self.NOW)
         self.assertIsNone(result["age_days"])
 
+    def test_malformed_creation_date_leaves_age_null(self):
+        img = {"ImageId": "ami-old", "Name": "n", "Tags": [], "CreationDate": "soon"}
+        result = status.describe_image("ami-old", "x86_64", img, None, self.NOW)
+        self.assertIsNone(result["age_days"])
+
+    def test_overrides_sharing_a_template_are_resolved_once(self):
+        group = self._group(**self._mixed(("lt-x86", "7"), ("lt-x86", "7")))
+        calls = []
+
+        def fake_versions(**kwargs):
+            calls.append(kwargs)
+            return {
+                "LaunchTemplateVersions": [
+                    {"LaunchTemplateData": {"ImageId": "ami-old"}}
+                ]
+            }
+
+        with (
+            mock.patch.object(
+                status.ec2,
+                "describe_launch_template_versions",
+                side_effect=fake_versions,
+                create=True,
+            ),
+            mock.patch.object(
+                status.autoscaling,
+                "describe_auto_scaling_groups",
+                return_value=group,
+                create=True,
+            ),
+        ):
+            ids = status.target_image_ids()
+        self.assertEqual(ids, {"ami-old"})
+        self.assertEqual(len(calls), 1)
+
 
 class HostImageStorageFleetTests(unittest.TestCase):
     def test_feeds_each_instances_ami_and_root_volume_through(self):
