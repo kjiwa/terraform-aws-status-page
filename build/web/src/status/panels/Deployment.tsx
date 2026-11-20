@@ -67,6 +67,10 @@ function imageBlock(img: Image | PanelError, repo: string | null, title: string 
   // the raw source AMI id itself.
   const base = img.source_ami_description || img.source_ami_name || null;
   const provenance: [string, KvValue][] = [];
+  const age =
+    img.age_days == null
+      ? null
+      : `${img.age_days} ${img.age_days === 1 ? 'day' : 'days'} since built`;
   if (img.git_sha) provenance.push(['Commit', commitCell(repo, img.git_sha)]);
   if (base) provenance.push(['Base', base]);
   return (
@@ -77,9 +81,13 @@ function imageBlock(img: Image | PanelError, repo: string | null, title: string 
           ['Name', img.name],
           ['AMI', img.id],
           ['Built', fmtDate(img.creation_date)],
+          ['Age', age],
           ...provenance,
         ]}
       />
+      {img.newer_image_pending && (
+        <p class="note">A newer image is adopted at the next replacement.</p>
+      )}
     </div>
   );
 }

@@ -1563,6 +1563,180 @@ class ImageFleetTests(unittest.TestCase):
         )
 
 
+class ImageAgeAndPendingTests(unittest.TestCase):
+    """image() reports the running AMI's age and whether the ASG's launch
+    templates already point at a different ImageId."""
+
+    NOW = dt(2026, 8, 20, 12)
+
+    @staticmethod
+    def _images(ImageIds):
+        return {
+            "Images": [
+                {
+                    "ImageId": i,
+                    "Name": f"name-{i}",
+                    "CreationDate": "2026-08-09T00:00:00.000Z",
+                    "Tags": [],
+                }
+                for i in ImageIds
+            ]
+        }
+
+    @staticmethod
+    def _group(**policy):
+        return {"AutoScalingGroups": [{"Instances": [], **policy}]}
+
+    @staticmethod
+    def _mixed(*overrides):
+        return {
+            "MixedInstancesPolicy": {
+                "LaunchTemplate": {
+                    "LaunchTemplateSpecification": {
+                        "LaunchTemplateId": "lt-base",
+                        "Version": "$Default",
+                    },
+                    "Overrides": [
+                        {
+                            "InstanceType": "t4g.small",
+                            "LaunchTemplateSpecification": {
+                                "LaunchTemplateId": lt,
+                                "Version": version,
+                            },
+                        }
+                        for lt, version in overrides
+                    ],
+                }
+            }
+        }
+
+    def _image(self, group, template_images):
+        def fake_versions(**kwargs):
+            image_id = template_images[
+                (kwargs["LaunchTemplateId"], kwargs["Versions"][0])
+            ]
+            return {
+                "LaunchTemplateVersions": [
+                    {"LaunchTemplateData": {"ImageId": image_id}}
+                ]
+            }
+
+        with (
+            mock.patch.object(
+                status.ec2, "describe_images", side_effect=self._images, create=True
+            ),
+            mock.patch.object(
+                status.ec2,
+                "describe_launch_template_versions",
+                side_effect=fake_versions,
+                create=True,
+            ),
+            mock.patch.object(
+                status.autoscaling,
+                "describe_auto_scaling_groups",
+                return_value=group,
+                create=True,
+            ),
+        ):
+            return status.image({"ami-old": "x86_64"}, now=self.NOW)["images"][0]
+
+    def test_age_is_whole_days_since_creation(self):
+        group = self._group(**self._mixed(("lt-x86", "7")))
+        result = self._image(
+            group, {("lt-base", "$Default"): "ami-old", ("lt-x86", "7"): "ami-old"}
+        )
+        self.assertEqual(result["age_days"], 11)
+        self.assertIs(result["newer_image_pending"], False)
+
+    def test_pending_when_an_override_template_points_at_another_ami(self):
+        group = self._group(**self._mixed(("lt-x86", "8")))
+        result = self._image(
+            group, {("lt-base", "$Default"): "ami-old", ("lt-x86", "8"): "ami-new"}
+        )
+        self.assertIs(result["newer_image_pending"], True)
+
+    def test_plain_launch_template_group_is_resolved(self):
+        group = self._group(
+            LaunchTemplate={"LaunchTemplateId": "lt-plain", "Version": "$Latest"}
+        )
+        result = self._image(group, {("lt-plain", "$Latest"): "ami-new"})
+        self.assertIs(result["newer_image_pending"], True)
+
+    def test_unresolvable_template_leaves_pending_null(self):
+        group = self._group(**self._mixed(("lt-x86", "8")))
+        result = self._image(
+            group,
+            {
+                ("lt-base", "$Default"): "ami-old",
+                ("lt-x86", "8"): "resolve:ssm:/ami/latest",
+            },
+        )
+        self.assertIsNone(result["newer_image_pending"])
+        self.assertEqual(result["age_days"], 11)
+
+    def test_template_lookup_failure_leaves_pending_null(self):
+        group = self._group(**self._mixed(("lt-x86", "8")))
+        with (
+            mock.patch.object(
+                status.ec2, "describe_images", side_effect=self._images, create=True
+            ),
+            mock.patch.object(
+                status.ec2,
+                "describe_launch_template_versions",
+                side_effect=Exception("AccessDenied"),
+                create=True,
+            ),
+            mock.patch.object(
+                status.autoscaling,
+                "describe_auto_scaling_groups",
+                return_value=group,
+                create=True,
+            ),
+        ):
+            result = status.image({"ami-old": "x86_64"}, now=self.NOW)["images"][0]
+        self.assertIsNone(result["newer_image_pending"])
+
+    def test_missing_creation_date_leaves_age_null(self):
+        img = {"ImageId": "ami-old", "Name": "n", "Tags": []}
+        result = status.describe_image("ami-old", "x86_64", img, None, self.NOW)
+        self.assertIsNone(result["age_days"])
+
+    def test_malformed_creation_date_leaves_age_null(self):
+        img = {"ImageId": "ami-old", "Name": "n", "Tags": [], "CreationDate": "soon"}
+        result = status.describe_image("ami-old", "x86_64", img, None, self.NOW)
+        self.assertIsNone(result["age_days"])
+
+    def test_overrides_sharing_a_template_are_resolved_once(self):
+        group = self._group(**self._mixed(("lt-x86", "7"), ("lt-x86", "7")))
+        calls = []
+
+        def fake_versions(**kwargs):
+            calls.append(kwargs)
+            return {
+                "LaunchTemplateVersions": [
+                    {"LaunchTemplateData": {"ImageId": "ami-old"}}
+                ]
+            }
+
+        with (
+            mock.patch.object(
+                status.ec2,
+                "describe_launch_template_versions",
+                side_effect=fake_versions,
+                create=True,
+            ),
+            mock.patch.object(
+                status.autoscaling,
+                "describe_auto_scaling_groups",
+                return_value=group,
+                create=True,
+            ),
+        ):
+            ids = status.target_image_ids()
+        self.assertEqual(ids, {"ami-old"})
+        self.assertEqual(len(calls), 1)
+
+
 class HostImageStorageFleetTests(unittest.TestCase):
     def test_feeds_each_instances_ami_and_root_volume_through(self):
         instances = [

@@ -1518,23 +1518,81 @@ def host():
 # --- image ------------------------------------------------------------------------
 
 
-def image(architectures):
+def launch_template_specs(group):
+    """The launch template specs instances are launched from: each
+    mixed-instances override's own, falling back to the policy's base template
+    for an override without one; a plain launch template group has just its own.
+    """
+    policy = group.get("MixedInstancesPolicy", {}).get("LaunchTemplate", {})
+    base = policy.get("LaunchTemplateSpecification") or group.get("LaunchTemplate")
+    overrides = policy.get("Overrides", [])
+    if not overrides:
+        return [base] if base else []
+    specs = [o.get("LaunchTemplateSpecification") or base for o in overrides]
+    return [spec for spec in specs if spec]
+
+
+def template_image_id(spec):
+    key = (
+        {"LaunchTemplateId": spec["LaunchTemplateId"]}
+        if spec.get("LaunchTemplateId")
+        else {"LaunchTemplateName": spec["LaunchTemplateName"]}
+    )
+    versions = ec2.describe_launch_template_versions(
+        **key, Versions=[spec.get("Version") or "$Default"]
+    )["LaunchTemplateVersions"]
+    return versions[0]["LaunchTemplateData"].get("ImageId")
+
+
+def target_image_ids():
+    """The AMI ids the ASG's launch templates resolve to right now, or None
+    when any cannot be read as a concrete AMI id (an SSM parameter reference,
+    a failed lookup): pending-ness is then unknown, not false.
+    """
+    try:
+        groups = autoscaling.describe_auto_scaling_groups(
+            AutoScalingGroupNames=[ASG_NAME]
+        )["AutoScalingGroups"]
+        specs = launch_template_specs(groups[0]) if groups else []
+        distinct = {tuple(sorted(spec.items())): spec for spec in specs}.values()
+        ids = {template_image_id(spec) for spec in distinct}
+    except Exception as e:
+        print(json.dumps({"launch_template_lookup_failed": f"{type(e).__name__}: {e}"}))
+        return None
+    if not ids or not all(i and i.startswith("ami-") for i in ids):
+        return None
+    return ids
+
+
+def image(architectures, now=None):
     """architectures maps each distinct AMI id to its architecture."""
     if not architectures:
         return {"error": "no running instance to read an AMI from"}
+    now = now or datetime.datetime.now(datetime.UTC)
     found = {
         img["ImageId"]: img
         for img in ec2.describe_images(ImageIds=list(architectures))["Images"]
     }
+    targets = target_image_ids()
     return {
         "images": [
-            describe_image(ami_id, architecture, found.get(ami_id))
+            describe_image(ami_id, architecture, found.get(ami_id), targets, now)
             for ami_id, architecture in architectures.items()
         ]
     }
 
 
-def describe_image(ami_id, architecture, img):
+def image_age_days(creation_date, now):
+    if not creation_date:
+        return None
+    try:
+        created = datetime.datetime.fromisoformat(creation_date)
+        return max(0, (now - created).days)
+    except (TypeError, ValueError):
+        return None
+
+
+def describe_image(ami_id, architecture, img, targets, now):
     if img is None:
         return {"error": f"AMI {ami_id} not found"}
     tags = {t["Key"]: t["Value"] for t in img.get("Tags", [])}
@@ -1562,6 +1620,10 @@ def describe_image(ami_id, architecture, img):
         "architecture": architecture,
         "name": img.get("Name"),
         "creation_date": img.get("CreationDate"),
+        "age_days": image_age_days(img.get("CreationDate"), now),
+        # A running AMI the templates no longer name is replaced, not
+        # patched: instances adopt the new image at their next replacement.
+        "newer_image_pending": None if targets is None else ami_id not in targets,
         "git_sha": tags.get("git_sha"),
         "source_ami": source_ami,
         "source_ami_name": tags.get("source_ami_name"),

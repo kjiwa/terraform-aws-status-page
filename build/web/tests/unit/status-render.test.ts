@@ -145,20 +145,26 @@ describe('status-render', () => {
     );
     expect(headings).toEqual(
       expect.arrayContaining([
-        'Instance i-04b3f86acd63292d94',
-        'Instance i-0a1b2c3d4e5f60718',
+        'Instance 1',
+        'Instance 2',
         'Fleet',
         'Machine image · x86_64',
         'Machine image · arm64',
-        'Root volume · i-04b3f86acd63292d94',
-        'Root volume · i-0a1b2c3d4e5f60718',
+        'Root volume 1',
+        'Root volume 2',
       ]),
     );
     expect(headings).not.toContain('Instance');
     const states = [...panelsOf(mounted.document).querySelectorAll('dt')]
       .filter((t) => t.textContent === 'State')
       .map((t) => t.nextElementSibling?.textContent);
-    expect(states).toEqual(['in-use', 'in-use', 'in-use', 'InService', 'Pending:Wait']);
+    expect(states).toEqual([
+      'In use (attached)',
+      'In use (attached)',
+      'In use (attached)',
+      'In service',
+      'Starting, held for the handoff',
+    ]);
 
     await expect(normalizeHtml(panelsOf(mounted.document))).toMatchFileSnapshot(
       '__snapshots__/status-render.fleet.html',

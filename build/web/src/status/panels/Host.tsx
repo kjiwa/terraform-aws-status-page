@@ -5,6 +5,7 @@ import { fmtDate, fmtDuration, fmtPct } from '../../shared/format';
 import type { ChartSeries } from '../charts/LineChart';
 import { LineChart } from '../charts/LineChart';
 import { useResettableIndex } from '../inspect';
+import { groupStateLabel, lifecycleLabel } from '../labels';
 import {
   availableRanges,
   defaultSelected,
@@ -14,6 +15,7 @@ import {
 } from '../ranges';
 import { useSeries } from '../series';
 import { Card, ErrNote } from '../ui/Card';
+import { Identifiers } from '../ui/Identifiers';
 import { Inspector } from '../ui/Inspector';
 import { Kv, type KvValue } from '../ui/Kv';
 import { LegendPair } from '../ui/LegendPair';
@@ -37,13 +39,12 @@ type Instance = HostData['instances'][number];
 // lone instance is not simply in service.
 function instancePairs(i: Instance, capacity: HostData['capacity'] | null): [string, KvValue][] {
   const pairs: [string, KvValue][] = [
-    ['ID', i.id],
     ['Type', i.type],
     ['Arch', i.architecture],
     ['AZ', i.az],
-    ['Lifecycle', i.lifecycle],
+    ['Lifecycle', lifecycleLabel(i.lifecycle)],
   ];
-  if (!capacity || i.state !== 'InService') pairs.push(['State', i.state]);
+  if (!capacity || i.state !== 'InService') pairs.push(['State', groupStateLabel(i.state)]);
   pairs.push(['Launched', fmtDate(i.launch_time)], ['Uptime', fmtDuration(i.uptime_s)]);
   if (capacity) pairs.push(['Capacity', capacityText(capacity)]);
   return pairs;
@@ -181,10 +182,17 @@ export function Host({
   return (
     <Card title="Host">
       <div class="subgrid">
-        {instances.map((i) => (
+        {instances.map((i, n) => (
           <div key={i.id}>
-            <h4>{instances.length > 1 ? `Instance ${i.id}` : 'Instance'}</h4>
+            <h4>{instances.length > 1 ? `Instance ${n + 1}` : 'Instance'}</h4>
             <Kv pairs={instancePairs(i, instances.length === 1 ? d.capacity : null)} />
+            <Identifiers
+              pairs={[
+                ['Instance ID', i.id],
+                ['AMI', i.ami_id],
+                ['Root volume', i.root_volume_id],
+              ]}
+            />
           </div>
         ))}
         {instances.length > 1 && (
@@ -196,6 +204,10 @@ export function Host({
         {showChart && (
           <div>
             <h4>CPU & memory</h4>
+            <p class="note">
+              CPU is the average across the group's instances; memory is the average the instances
+              report. Both show percent used.
+            </p>
             <RangeSelector
               available={hostAvailable}
               selected={hostSelected ?? ''}

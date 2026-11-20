@@ -63,6 +63,7 @@ export function Cost({ d }: { d: CostData | PanelError | undefined }) {
 
   return (
     <Card title="Cost (month to date)">
+      <p class="note">Account-wide, month to date through yesterday (UTC).</p>
       {budget ? (
         <>
           <StatRow

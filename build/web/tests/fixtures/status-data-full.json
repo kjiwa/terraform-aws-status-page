@@ -3578,6 +3578,8 @@
         "architecture": "x86_64",
         "name": "status-page-base-x86-459092227",
         "creation_date": "2026-06-06T12:00:00Z",
+        "age_days": 9,
+        "newer_image_pending": true,
         "git_sha": "9c2dc1a2fd447d3e735ea1108dbfdde0d043672e",
         "source_ami": null,
         "source_ami_name": "al2023-ami-minimal",

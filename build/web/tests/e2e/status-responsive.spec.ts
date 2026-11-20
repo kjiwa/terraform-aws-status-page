@@ -7,58 +7,67 @@
  * localStorage, and the strip stays overflow-free even at its widest
  * (the 90-cell range, the worst case for `.strip`'s flex-shrink layout).
  */
-import { ALL_TOGGLES_ON, THEME_KEY } from '../support/shell.ts';
+import { ALL_TOGGLES_OFF, ALL_TOGGLES_ON, THEME_KEY } from '../support/shell.ts';
 import { expect, test } from './fixtures.ts';
 
 const VIEWPORTS = [
   { width: 320, height: 800 },
+  { width: 393, height: 852 },
   { width: 768, height: 1000 },
+  { width: 1280, height: 900 },
   { width: 1440, height: 1000 },
 ];
+
+const TOGGLE_SETS = [
+  ['every toggle on', ALL_TOGGLES_ON],
+  ['every toggle off', ALL_TOGGLES_OFF],
+] as const;
 
 const THEMES = ['light', 'dark'] as const;
 
 for (const viewport of VIEWPORTS) {
   for (const themeName of THEMES) {
-    test(`no horizontal overflow at ${viewport.width}px, ${themeName} theme`, async ({
-      page,
-      startStatus,
-    }) => {
-      await page.setViewportSize(viewport);
-      const baseURL = await startStatus({
-        server: { toggles: ALL_TOGGLES_ON },
-        tokens: { access: 'e2e-access-token' },
-        localStorage: { [THEME_KEY]: JSON.stringify({ scheme: themeName }) },
+    for (const [toggleName, toggles] of TOGGLE_SETS) {
+      test(`no horizontal overflow at ${viewport.width}px, ${themeName} theme, ${toggleName}`, async ({
+        page,
+        startStatus,
+      }) => {
+        await page.setViewportSize(viewport);
+        const baseURL = await startStatus({
+          server: { toggles },
+          tokens: { access: 'e2e-access-token' },
+          localStorage: { [THEME_KEY]: JSON.stringify({ scheme: themeName }) },
+        });
+        await page.goto(`${baseURL}/status`);
+        await expect(page.locator('#panels .card > h3').first()).toBeVisible();
+
+        await expect(page.locator('html')).toHaveAttribute('data-theme', themeName);
+
+        const overflow = await page.evaluate(() => {
+          const el = document.scrollingElement ?? document.documentElement;
+          return { scrollWidth: el.scrollWidth, clientWidth: el.clientWidth };
+        });
+        expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.clientWidth + 1);
+
+        // Switch the Reliability strip to its widest range (90 cells) --
+        // still flex-shrink, not flex-wrap (see .strip's CSS), so this is
+        // the layout's actual worst case for horizontal overflow, not a
+        // theoretical one.
+        await page
+          .locator('.card', { hasText: 'Reliability' })
+          .getByRole('button', { name: '90d', exact: true })
+          .click();
+        await expect(
+          page.locator('.card', { hasText: 'Reliability' }).locator('.strip > div'),
+        ).toHaveCount(90);
+
+        const overflowAt90d = await page.evaluate(() => {
+          const el = document.scrollingElement ?? document.documentElement;
+          return { scrollWidth: el.scrollWidth, clientWidth: el.clientWidth };
+        });
+        expect(overflowAt90d.scrollWidth).toBeLessThanOrEqual(overflowAt90d.clientWidth + 1);
       });
-      await page.goto(`${baseURL}/status`);
-      await expect(page.locator('#panels .card > h3').first()).toBeVisible();
-
-      await expect(page.locator('html')).toHaveAttribute('data-theme', themeName);
-
-      const overflow = await page.evaluate(() => {
-        const el = document.scrollingElement ?? document.documentElement;
-        return { scrollWidth: el.scrollWidth, clientWidth: el.clientWidth };
-      });
-      expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.clientWidth + 1);
-
-      // Switch the Reliability strip to its widest range (90 cells) --
-      // still flex-shrink, not flex-wrap (see .strip's CSS), so this is
-      // the layout's actual worst case for horizontal overflow, not a
-      // theoretical one.
-      await page
-        .locator('.card', { hasText: 'Reliability' })
-        .getByRole('button', { name: '90d', exact: true })
-        .click();
-      await expect(
-        page.locator('.card', { hasText: 'Reliability' }).locator('.strip > div'),
-      ).toHaveCount(90);
-
-      const overflowAt90d = await page.evaluate(() => {
-        const el = document.scrollingElement ?? document.documentElement;
-        return { scrollWidth: el.scrollWidth, clientWidth: el.clientWidth };
-      });
-      expect(overflowAt90d.scrollWidth).toBeLessThanOrEqual(overflowAt90d.clientWidth + 1);
-    });
+    }
   }
 }
 
