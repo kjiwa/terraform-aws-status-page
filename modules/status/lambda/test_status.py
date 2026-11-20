@@ -1612,8 +1612,14 @@ class ImageAgeAndPendingTests(unittest.TestCase):
 
     def _image(self, group, template_images):
         def fake_versions(**kwargs):
-            image_id = template_images[(kwargs["LaunchTemplateId"], kwargs["Versions"][0])]
-            return {"LaunchTemplateVersions": [{"LaunchTemplateData": {"ImageId": image_id}}]}
+            image_id = template_images[
+                (kwargs["LaunchTemplateId"], kwargs["Versions"][0])
+            ]
+            return {
+                "LaunchTemplateVersions": [
+                    {"LaunchTemplateData": {"ImageId": image_id}}
+                ]
+            }
 
         with (
             mock.patch.object(
@@ -1660,7 +1666,10 @@ class ImageAgeAndPendingTests(unittest.TestCase):
         group = self._group(**self._mixed(("lt-x86", "8")))
         result = self._image(
             group,
-            {("lt-base", "$Default"): "ami-old", ("lt-x86", "8"): "resolve:ssm:/ami/latest"},
+            {
+                ("lt-base", "$Default"): "ami-old",
+                ("lt-x86", "8"): "resolve:ssm:/ami/latest",
+            },
         )
         self.assertIsNone(result["newer_image_pending"])
         self.assertEqual(result["age_days"], 11)
