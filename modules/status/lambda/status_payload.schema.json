@@ -694,6 +694,21 @@
             "null"
           ]
         },
+        "age_days": {
+          "description": "Whole days from creation_date to the response; null without a creation date.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "newer_image_pending": {
+          "description": "True when the ASG's launch templates name a different AMI than this one, adopted at the next instance replacement; null when the templates cannot be resolved to AMI ids.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "git_sha": {
           "type": [
             "string",

@@ -33,13 +33,15 @@ data "aws_iam_policy_document" "status" {
   }
 
   # Describe* calls don't support resource-level scoping. Covers the host panel
-  # (instance + ASG) and the image panel (AMI).
+  # (instance + ASG) and the image panel (AMI, and the launch template versions
+  # the ASG would launch next).
   statement {
     sid    = "DescribeInfra"
     effect = "Allow"
     actions = [
       "ec2:DescribeInstances",
       "ec2:DescribeImages",
+      "ec2:DescribeLaunchTemplateVersions",
       "autoscaling:DescribeAutoScalingGroups",
     ]
     resources = ["*"]
