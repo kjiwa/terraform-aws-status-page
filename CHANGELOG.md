@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.10.0
+
+### Added
+
+- `icon_svg` (optional string, default `null`): SVG markup served at `<path_prefix>/icon.svg` and used as the page's favicon; `null` serves an empty SVG. The `behaviors` output gains a shell behavior for `<path_prefix>/icon.svg`, after `config.js`.
+
+### Upgrade
+
+- Optional, no action. Consumers that attach `behaviors` as given pick up the new route by bumping `?ref=v0.10.0`.
+
 ## v0.9.0
 
 ### Added

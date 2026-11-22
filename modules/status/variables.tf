@@ -48,6 +48,12 @@ variable "config_js" {
   type        = string
 }
 
+variable "icon_svg" {
+  description = "SVG markup served as the status page favicon; null serves an empty icon."
+  type        = string
+  default     = null
+}
+
 variable "auth_header" {
   description = "Request header carrying the caller's token, the only header CloudFront forwards to the Lambda; it cannot be Authorization because OAC overwrites that with its SigV4 signature."
   type        = string
