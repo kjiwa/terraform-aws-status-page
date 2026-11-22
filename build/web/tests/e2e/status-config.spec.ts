@@ -59,6 +59,16 @@ test.describe('config validation', () => {
   });
 });
 
+test('the favicon link points at the prefix icon.svg once config loads', async ({
+  page,
+  startStatus,
+}) => {
+  const baseURL = await startStatus({ server: { toggles: ALL_TOGGLES_ON }, tokens: SIGNED_IN });
+  await page.goto(`${baseURL}/status/`);
+  await expect(page.locator('h1')).toHaveText('Fixture status');
+  await expect(page.locator('link[rel="icon"]')).toHaveAttribute('href', '/status/icon.svg');
+});
+
 test('the page works at a trailing slash and shows the configured title', async ({
   page,
   startStatus,

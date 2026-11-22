@@ -61,6 +61,12 @@ function applyConfig(cfg: StatusConfig): void {
   hideDisabledSkeletons(cfg.disabledPanels);
 }
 
+function applyIcon(prefix: string): void {
+  document
+    .querySelector<HTMLLinkElement>('link[rel="icon"]')
+    ?.setAttribute('href', `${prefix}/icon.svg`);
+}
+
 async function boot(): Promise<void> {
   const prefix = location.pathname.replace(/\/$/, '');
   try {
@@ -78,6 +84,7 @@ async function boot(): Promise<void> {
   }
   setConfig(result.config);
   applyConfig(result.config);
+  applyIcon(prefix);
   const panelsRoot = document.getElementById('panels');
   if (panelsRoot) render(<App />, panelsRoot);
 }

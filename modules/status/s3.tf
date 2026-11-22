@@ -75,6 +75,14 @@ resource "aws_s3_object" "status_shell" {
   cache_control = "public, max-age=60"
 }
 
+resource "aws_s3_object" "status_icon" {
+  bucket        = aws_s3_bucket.status_assets.id
+  key           = "${local.shell_key_prefix}/icon.svg"
+  content       = coalesce(var.icon_svg, "<svg xmlns=\"http://www.w3.org/2000/svg\"/>")
+  content_type  = "image/svg+xml"
+  cache_control = "public, max-age=60"
+}
+
 resource "aws_s3_object" "status_config" {
   bucket        = aws_s3_bucket.status_assets.id
   key           = "${local.shell_key_prefix}/config.js"

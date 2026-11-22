@@ -119,6 +119,7 @@ locals {
       merge(local.shell_behavior, { path_pattern = var.path_prefix, function_arn = aws_cloudfront_function.status_rewrite.arn, rewrite = true }),
       merge(local.shell_behavior, { path_pattern = "${var.path_prefix}/", function_arn = aws_cloudfront_function.status_rewrite.arn, rewrite = true }),
       merge(local.shell_behavior, { path_pattern = "${var.path_prefix}/config.js" }),
+      merge(local.shell_behavior, { path_pattern = "${var.path_prefix}/icon.svg" }),
       merge(local.lambda_behavior, { path_pattern = "${var.path_prefix}/data" }),
       merge(local.lambda_behavior, { path_pattern = "${var.path_prefix}/series" }),
     ],

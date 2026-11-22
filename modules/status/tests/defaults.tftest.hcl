@@ -61,8 +61,9 @@ run "names_derive_from_prefix" {
     condition = alltrue([
       aws_s3_object.status_shell.key == "status/index.html",
       aws_s3_object.status_config.key == "status/config.js",
+      aws_s3_object.status_icon.key == "status/icon.svg",
     ])
-    error_message = "Shell and config keys must sit under the path prefix without its leading slash."
+    error_message = "Shell, config and icon keys must sit under the path prefix without its leading slash."
   }
 }
 
@@ -80,17 +81,43 @@ run "rewrite_flag_marks_function_behaviors" {
   }
 }
 
+run "icon_defaults_to_empty_svg" {
+  command = plan
+
+  assert {
+    condition = alltrue([
+      aws_s3_object.status_icon.content == "<svg xmlns=\"http://www.w3.org/2000/svg\"/>",
+      aws_s3_object.status_icon.content_type == "image/svg+xml",
+      aws_s3_object.status_icon.cache_control == "public, max-age=60",
+    ])
+    error_message = "A null icon_svg serves an empty SVG as image/svg+xml with a 60 second cache."
+  }
+}
+
+run "icon_svg_sets_content" {
+  command = plan
+
+  variables {
+    icon_svg = "<svg xmlns=\"http://www.w3.org/2000/svg\"><circle r=\"1\"/></svg>"
+  }
+
+  assert {
+    condition     = aws_s3_object.status_icon.content == var.icon_svg
+    error_message = "icon_svg must be served verbatim."
+  }
+}
+
 run "behaviors_without_public" {
   command = plan
 
   assert {
-    condition     = length(output.behaviors) == 5
-    error_message = "Five behaviors without public_reliability."
+    condition     = length(output.behaviors) == 6
+    error_message = "Six behaviors without public_reliability."
   }
 
   assert {
-    condition     = [for b in output.behaviors : b.path_pattern if b.origin_id == "status-s3"] == ["/status", "/status/", "/status/config.js"]
-    error_message = "The shell, its slash form and config.js route to the S3 origin."
+    condition     = [for b in output.behaviors : b.path_pattern if b.origin_id == "status-s3"] == ["/status", "/status/", "/status/config.js", "/status/icon.svg"]
+    error_message = "The shell, its slash form, config.js and icon.svg route to the S3 origin."
   }
 }
 
@@ -102,12 +129,12 @@ run "behaviors_with_public" {
   }
 
   assert {
-    condition     = length(output.behaviors) == 6
-    error_message = "Six behaviors with public_reliability."
+    condition     = length(output.behaviors) == 7
+    error_message = "Seven behaviors with public_reliability."
   }
 
   assert {
-    condition     = [for b in output.behaviors : b.path_pattern][5] == "/status/public"
+    condition     = [for b in output.behaviors : b.path_pattern][6] == "/status/public"
     error_message = "The public behavior comes last."
   }
 }
