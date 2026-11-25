@@ -22,7 +22,7 @@ function outcomeBadge(c: Change) {
 // Auto Scaling launches are listed, so it follows the filter.
 function ChangesTable({ changes, withTrigger }: { changes: Change[]; withTrigger: boolean }) {
   const hasDuration = changes.some((c) => c.duration_s !== undefined);
-  const hasOutage = changes.some((c) => c.outage !== undefined);
+  const hasDowntime = changes.some((c) => c.down_s !== undefined);
   const hasId = changes.some((c) => c.id);
   return (
     <details>
@@ -36,7 +36,7 @@ function ChangesTable({ changes, withTrigger }: { changes: Change[]; withTrigger
               {withTrigger && <th>Trigger</th>}
               <th>Outcome</th>
               {hasDuration && <th>Duration</th>}
-              {hasOutage && <th>Outage</th>}
+              {hasDowntime && <th>Downtime</th>}
               {hasId && <th>Id</th>}
             </tr>
           </thead>
@@ -50,14 +50,14 @@ function ChangesTable({ changes, withTrigger }: { changes: Change[]; withTrigger
                 {withTrigger && <td class="nowrap">{triggerLabel(c)}</td>}
                 <td>{outcomeBadge(c)}</td>
                 {hasDuration && <td>{fmtDuration(c.duration_s)}</td>}
-                {hasOutage && (
+                {hasDowntime && (
                   <td>
-                    {c.outage === undefined ? (
+                    {c.down_s === null || c.down_s === undefined ? (
                       '—'
+                    ) : c.down_s === 0 ? (
+                      <span class="badge">none</span>
                     ) : (
-                      <span class={c.outage ? 'badge badge-bad' : 'badge'}>
-                        {c.outage ? 'yes' : 'no'}
-                      </span>
+                      <span class="badge badge-bad">{fmtDuration(c.down_s)}</span>
                     )}
                   </td>
                 )}
@@ -67,6 +67,12 @@ function ChangesTable({ changes, withTrigger }: { changes: Change[]; withTrigger
           </tbody>
         </table>
       </div>
+      {hasDowntime && (
+        <p class="note">
+          Downtime is SiteUp loss during each change (90 s slack on either side), measured at
+          1-minute resolution for 15 days and 5-minute for 63 days; older changes show a dash.
+        </p>
+      )}
     </details>
   );
 }

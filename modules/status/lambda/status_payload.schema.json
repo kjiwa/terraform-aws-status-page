@@ -404,7 +404,7 @@
       }
     },
     "Change": {
-      "description": "One deliberate change recorded by availability.py's change log, newest first; `outage` is derived by status.py from overlap with the episodes.",
+      "description": "One deliberate change recorded by availability.py's change log, newest first; `down_s` is SiteUp downtime in seconds measured over the change window (null when older than CloudWatch's 300 s retention or unmeasured).",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -415,7 +415,7 @@
         "outcome",
         "duration_s",
         "description",
-        "outage"
+        "down_s"
       ],
       "properties": {
         "at": {
@@ -461,8 +461,12 @@
             "null"
           ]
         },
-        "outage": {
-          "type": "boolean"
+        "down_s": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
         }
       }
     },

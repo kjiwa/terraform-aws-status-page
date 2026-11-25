@@ -30,9 +30,11 @@ test('a degraded panel shows its own error note without taking its siblings down
   await expect(backupsCard.locator('.subgrid')).toHaveCount(0);
 
   // Siblings from every other section render normally.
-  await expect(page.locator('.card', { hasText: 'Reliability' }).locator('.stat-row')).toHaveCount(
-    1,
-  );
+  await expect(
+    page
+      .locator('.card', { has: page.locator('h3', { hasText: /^Reliability$/ }) })
+      .locator('.stat-row'),
+  ).toHaveCount(1);
   await expect(page.locator('.card', { hasText: 'Host' }).locator('.subgrid')).toHaveCount(1);
   await expect(page.locator('.card', { hasText: 'Storage' }).locator('.subgrid')).toHaveCount(1);
   await expect(page.locator('#gate')).toBeHidden();

@@ -47,8 +47,12 @@ for (const viewport of VIEWPORTS) {
       await page.setViewportSize(viewport);
       await gotoStatus(page, startStatus, theme);
 
-      const strip = page.locator('.card', { hasText: 'Reliability' }).locator('.strip');
-      const readout = page.locator('.card', { hasText: 'Reliability' }).locator('.strip-key');
+      const strip = page
+        .locator('.card', { has: page.locator('h3', { hasText: /^Reliability$/ }) })
+        .locator('.strip');
+      const readout = page
+        .locator('.card', { has: page.locator('h3', { hasText: /^Reliability$/ }) })
+        .locator('.strip-key');
 
       // Resting: aria-valuenow is the last cell, matching Reliability.tsx's
       // resting-index contract.
@@ -90,7 +94,7 @@ test('latency chart: hovering the scrub overlay draws a crosshair and updates th
 }) => {
   await gotoStatus(page, startStatus, 'light');
 
-  const card = page.locator('.card', { hasText: 'Reliability' });
+  const card = page.locator('.card', { has: page.locator('h3', { hasText: /^Reliability$/ }) });
   const chartScrub = card.locator('.chart-scrub');
   const svg = card.locator('.chart svg').first();
 
@@ -125,7 +129,9 @@ test.describe('touch', () => {
     await page.setViewportSize({ width: 393, height: 900 });
     await gotoStatus(page, startStatus, 'light');
 
-    const strip = page.locator('.card', { hasText: 'Reliability' }).locator('.strip');
+    const strip = page
+      .locator('.card', { has: page.locator('h3', { hasText: /^Reliability$/ }) })
+      .locator('.strip');
     const box = await strip.boundingBox();
     if (!box) throw new Error('status-inspector: strip has no bounding box');
     const midY = box.y + box.height / 2;
@@ -160,8 +166,12 @@ test('the strip and chart scrub overlay keep touch-action: pan-y, so a vertical 
   // depends on, is this computed CSS property (see status.css's .strip and
   // .chart-scrub rules): a scrub surface without it would make Chromium
   // treat every touch on it as fully page-scroll-blocking.
-  const strip = page.locator('.card', { hasText: 'Reliability' }).locator('.strip');
-  const chartScrub = page.locator('.card', { hasText: 'Reliability' }).locator('.chart-scrub');
+  const strip = page
+    .locator('.card', { has: page.locator('h3', { hasText: /^Reliability$/ }) })
+    .locator('.strip');
+  const chartScrub = page
+    .locator('.card', { has: page.locator('h3', { hasText: /^Reliability$/ }) })
+    .locator('.chart-scrub');
   await expect(strip).toHaveCSS('touch-action', 'pan-y');
   await expect(chartScrub).toHaveCSS('touch-action', 'pan-y');
 });

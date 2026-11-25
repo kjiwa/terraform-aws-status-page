@@ -14,7 +14,9 @@ test('chart-key items are evenly spaced', async ({ page, startStatus }) => {
 
   // Reliability's latency key: two LegendPairs (p50, p90) plus the scope
   // span (`· <date> UTC`) -- three items, two gaps.
-  const chartKey = page.locator('.card', { hasText: 'Reliability' }).locator('.chart-key');
+  const chartKey = page
+    .locator('.card', { has: page.locator('h3', { hasText: /^Reliability$/ }) })
+    .locator('.chart-key');
   await expect(chartKey.locator('> *')).toHaveCount(3);
 
   const rects = await chartKey.locator('> *').evaluateAll((els) =>

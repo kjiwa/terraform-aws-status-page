@@ -54,11 +54,13 @@ for (const viewport of VIEWPORTS) {
         // the layout's actual worst case for horizontal overflow, not a
         // theoretical one.
         await page
-          .locator('.card', { hasText: 'Reliability' })
+          .locator('.card', { has: page.locator('h3', { hasText: /^Reliability$/ }) })
           .getByRole('button', { name: '90d', exact: true })
           .click();
         await expect(
-          page.locator('.card', { hasText: 'Reliability' }).locator('.strip > div'),
+          page
+            .locator('.card', { has: page.locator('h3', { hasText: /^Reliability$/ }) })
+            .locator('.strip > div'),
         ).toHaveCount(90);
 
         const overflowAt90d = await page.evaluate(() => {

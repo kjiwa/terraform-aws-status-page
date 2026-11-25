@@ -3250,7 +3250,7 @@
       "outcome": "succeeded",
       "duration_s": 240,
       "description": null,
-      "outage": false
+      "down_s": 0
     },
     {
       "at": "2026-06-11T12:00:00Z",
@@ -3260,7 +3260,7 @@
       "outcome": "rollback-succeeded",
       "duration_s": 310,
       "description": "Rolled back to the previous revision",
-      "outage": true
+      "down_s": 180
     },
     {
       "at": "2026-06-06T12:00:00Z",
@@ -3270,7 +3270,7 @@
       "outcome": "succeeded",
       "duration_s": 420,
       "description": null,
-      "outage": true
+      "down_s": 240
     },
     {
       "at": "2026-06-03T12:00:00Z",
@@ -3280,7 +3280,7 @@
       "outcome": "stopped",
       "duration_s": 95,
       "description": null,
-      "outage": false
+      "down_s": 0
     },
     {
       "at": "2026-05-29T12:00:00Z",
@@ -3290,7 +3290,7 @@
       "outcome": "succeeded",
       "duration_s": 45,
       "description": null,
-      "outage": false
+      "down_s": 0
     },
     {
       "at": "2026-05-16T12:00:00Z",
@@ -3300,7 +3300,7 @@
       "outcome": "failed",
       "duration_s": null,
       "description": null,
-      "outage": false
+      "down_s": 0
     },
     {
       "at": "2026-05-02T12:00:00Z",
@@ -3310,7 +3310,7 @@
       "outcome": "succeeded",
       "duration_s": 260,
       "description": null,
-      "outage": false
+      "down_s": null
     }
   ],
   "interruptions": [
