@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.11.0
+
+### Changed
+
+- `changes[]` replaces `outage` (episode overlap) with `down_s` (number or `null`), measuring `SiteUp` downtime across each change's window (`[at - duration_s - 90 s, at + 90 s]`) at 60 s resolution under 15 days and 300 s under 63 days, in one `GetMetricData` call per period. Older or unmeasured changes report `null`.
+- The Changes table replaces the `Outage` column with `Downtime` (`none`, formatted bad badge, or `—`) and adds a caption naming the measurement and retention scope.
+- The Incidents card adds a caption explaining that it lists outages long enough to raise the site-down alarm, while shorter dips appear on the Reliability strip and in Changes.
+- `modules/availability` documents the `canary_enabled = false` publisher contract: one `SiteUp` sample per calendar minute, timestamped to that minute.
+
+### Upgrade
+
+- Consumers reading `changes[].outage` must switch to `changes[].down_s` (`0` for no measured downtime, positive seconds for downtime, `null` when older than 63 days or unmeasured).
+- Consumers with `canary_enabled = false` should publish one `SiteUp` sample per calendar minute, timestamped to that minute, to avoid skipped-minute backfill zeroes.
+
 ## v0.10.0
 
 ### Added

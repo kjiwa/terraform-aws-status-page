@@ -227,12 +227,13 @@ describe('Changes card', () => {
   it('defaults to deliberate changes, without the trigger column, newest first', async () => {
     const c = changesCard(await mountOperator());
     expect(c?.querySelector('[aria-pressed="true"]')?.textContent).toBe('Deliberate');
-    expect(headers(c)).toEqual(['Time (UTC)', 'Change', 'Outcome', 'Duration', 'Outage', 'Id']);
+    expect(headers(c)).toEqual(['Time (UTC)', 'Change', 'Outcome', 'Duration', 'Downtime', 'Id']);
     const r = rows(c);
     expect(r).toHaveLength(5);
     const times = r.map((x) => x[0] ?? '');
     expect(times).toEqual([...times].sort().reverse());
     expect(r.map((x) => x[1])).toContain('instance refresh');
+    expect(r.map((x) => x[4])).toEqual(['none', '3m 0s', '4m 0s', 'none', '—']);
     expect(summary(c)).toMatch(/^5 changes · most recent /);
     expect(c?.querySelectorAll('.badge-bad').length).toBeGreaterThan(0);
   });
@@ -246,7 +247,7 @@ describe('Changes card', () => {
       'Trigger',
       'Outcome',
       'Duration',
-      'Outage',
+      'Downtime',
       'Id',
     ]);
     expect(rows(c)).toHaveLength(7);

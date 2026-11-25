@@ -7,7 +7,7 @@ import { ALL_TOGGLES_ON } from '../support/shell.ts';
 import { expect, test, type StartStatusOptions } from './fixtures.ts';
 
 function reliabilityCard(page: Page) {
-  return page.locator('.card', { hasText: 'Reliability' });
+  return page.locator('.card', { has: page.locator('h3', { hasText: /^Reliability$/ }) });
 }
 
 // Navigates and waits for the first card to actually render -- without
@@ -141,7 +141,9 @@ test('signed out with public_reliability on: no pan controls render', async ({
 
   await expect(page.locator('.card > h3')).toHaveText(['Reliability', 'Incidents', 'Changes']);
   await expect(
-    page.locator('.card', { hasText: 'Reliability' }).locator('.window-nav'),
+    page
+      .locator('.card', { has: page.locator('h3', { hasText: /^Reliability$/ }) })
+      .locator('.window-nav'),
   ).toHaveCount(0);
 });
 

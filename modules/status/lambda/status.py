@@ -238,12 +238,15 @@ INSIGHTS_DEFAULT_WAIT_S = 10
 # missing older episodes that the 1y uptime number already reflects.
 INCIDENTS_LOOKBACK_DAYS = 365
 
-# A change counts as an outage when an episode overlaps its [start, at] span
-# within this slack. Episode edges are probe resolution (the first failing
-# minute, floored), so an outage that began with the change can read up to a
-# minute early, and one that ended with it up to a minute late; 90 s adds half
-# a minute for the offset between the change's own timestamps and the probe.
+# SiteUp downtime around a change is summed over [start - slack, at + slack].
+# 90 s absorbs probe alignment and clock offset between the change's timestamps
+# and the per-minute SiteUp bucket.
 CHANGE_OUTAGE_SLACK_S = 90
+
+# CloudWatch metric retention tiers used for per-change SiteUp downtime:
+# 60 s datapoints are retained for 15 days, 300 s for 63 days. Older changes
+# report down_s = None because 3600 s rollups are too coarse for a change window.
+CHANGE_DOWNTIME_TIERS = ((60, 15), (300, 63))
 
 # Every AWS call this module makes goes through a client bound to this: the
 # botocore defaults (60s read / 60s connect, 3 attempts) let one stalled call
@@ -1389,9 +1392,10 @@ def incidents(days=INCIDENTS_LOOKBACK_DAYS, now=None, episode_log=None):
 
 def changes(days=INCIDENTS_LOOKBACK_DAYS, now=None, episode_log=None):
     """Deployments and instance refreshes recorded by the availability Lambda,
-    newest first, one per id, each with `outage`: whether an episode of the
-    change's own cause overlaps it (see change_caused_outage()). Windowed on
-    the record's own `at`; lines lacking `id` or `at` are skipped.
+    newest first, one per id, each with `down_s`: SiteUp downtime in seconds
+    measured over the change's [start - slack, at + slack] window, or None when
+    the window predates CloudWatch's 300 s retention or has no datapoints.
+    Windowed on the record's own `at`; lines lacking `id` or `at` are skipped.
     """
     now = now or datetime.datetime.now(datetime.UTC)
     cutoff = iso(now - datetime.timedelta(days=days))
@@ -1399,32 +1403,79 @@ def changes(days=INCIDENTS_LOOKBACK_DAYS, now=None, episode_log=None):
     records = episode_log.records(CHANGES_LOG_STREAM)
     complete = [(ts, c) for ts, c in records if c.get("id") and c.get("at")]
     recorded = [c for c in latest_per(complete, lambda c: c["id"]) if c["at"] >= cutoff]
-    episodes = incidents(days, now, episode_log)
-    for c in recorded:
-        c["outage"] = change_caused_outage(c, episodes)
+    attach_change_downtime(recorded, now)
     recorded.sort(key=lambda c: c["at"], reverse=True)
     return recorded
 
 
-def change_caused_outage(change, episodes):
-    """True when an episode overlaps the change's [start, at] span within
-    CHANGE_OUTAGE_SLACK_S and its cause is the change's own kind: a deploy by a
-    deliberate creator and a `deploy` episode, an instance refresh and an
-    `instance-refresh` episode. Downtime beside an unrelated episode, or beside
-    an Auto Scaling launch deployment, belongs to that episode instead.
-    """
-    if change.get("kind") == "deploy" and not is_deliberate_deploy(change):
-        return False
+def change_window(change):
     slack = datetime.timedelta(seconds=CHANGE_OUTAGE_SLACK_S)
     end = parse_iso(change["at"])
     start = end - datetime.timedelta(seconds=change.get("duration_s") or 0)
-    return any(
-        ep.get("cause") == change.get("kind")
-        and parse_iso(ep["started"]) <= end + slack
-        and parse_iso(ep["ended"]) >= start - slack
-        for ep in episodes
-        if ep.get("started") and ep.get("ended")
+    return start - slack, end + slack
+
+
+def siteup_averages(start, end, period_s):
+    r = cloudwatch.get_metric_data(
+        MetricDataQueries=[
+            {
+                "Id": "avg",
+                "MetricStat": {
+                    "Metric": {
+                        "Namespace": SITEUP_METRIC_NAMESPACE,
+                        "MetricName": "SiteUp",
+                    },
+                    "Period": period_s,
+                    "Stat": "Average",
+                },
+                "ReturnData": True,
+            }
+        ],
+        StartTime=start,
+        EndTime=end,
+        ScanBy="TimestampAscending",
     )
+    res = r["MetricDataResults"][0]
+    return list(zip(res["Timestamps"], res["Values"]))
+
+
+def attach_change_downtime(recorded, now):
+    """Populate `down_s` on each change via one GetMetricData call per
+    CloudWatch retention tier (60 s under 15 days, 300 s under 63 days).
+    """
+    by_period = collections.defaultdict(list)
+    for c in recorded:
+        win_start, win_end = change_window(c)
+        period_s = next(
+            (
+                p
+                for p, max_days in CHANGE_DOWNTIME_TIERS
+                if win_start > now - datetime.timedelta(days=max_days)
+            ),
+            None,
+        )
+        if period_s is None:
+            c["down_s"] = None
+        else:
+            by_period[period_s].append((c, win_start, win_end))
+
+    for period_s, items in by_period.items():
+        period_td = datetime.timedelta(seconds=period_s)
+        qstart = floor_utc(min(s for _, s, _ in items), period_s)
+        qend = floor_utc(max(e for _, _, e in items), period_s) + period_td
+        series = siteup_averages(qstart, qend, period_s)
+        for c, win_start, win_end in items:
+            overlapping = [
+                avg
+                for ts, avg in series
+                if ts < win_end and ts + period_td > win_start
+            ]
+            if not overlapping:
+                c["down_s"] = None
+            else:
+                c["down_s"] = round(
+                    sum(max(0.0, 1.0 - avg) * period_s for avg in overlapping)
+                )
 
 
 def is_deliberate_deploy(change):

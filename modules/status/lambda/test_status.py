@@ -2470,9 +2470,15 @@ class IncidentsRobustnessTests(unittest.TestCase):
 
 
 class ChangesTests(unittest.TestCase):
-    def read(self, changes, episodes=()):
-        rows = change_rows(*changes) + episode_rows(*[(NOW_MS, e) for e in episodes])
-        with FakeLogs({EPISODES: rows}).patch():
+    def read(self, changes):
+        rows = change_rows(*changes)
+        empty = {"MetricDataResults": [{"Id": "avg", "Timestamps": [], "Values": []}]}
+        with (
+            FakeLogs({EPISODES: rows}).patch(),
+            mock.patch.object(
+                status.cloudwatch, "get_metric_data", return_value=empty, create=True
+            ),
+        ):
             return status.changes(365, NOW)
 
     def test_keeps_the_latest_record_per_id(self):
@@ -2503,71 +2509,6 @@ class ChangesTests(unittest.TestCase):
         )
         self.assertEqual([c["id"] for c in got], ["b", "c", "a"])
 
-    def test_outage_is_derived_from_overlap_with_episodes(self):
-        # change spans 09:58:00 - 10:00:00
-        at = "2026-09-01T10:00:00Z"
-        cases = {
-            "inside": ("2026-09-01T09:59:00Z", "2026-09-01T10:03:00Z", True),
-            "starts_after_within_slack": (
-                "2026-09-01T10:01:00Z",
-                "2026-09-01T10:04:00Z",
-                True,
-            ),
-            "starts_after_beyond_slack": (
-                "2026-09-01T10:02:00Z",
-                "2026-09-01T10:05:00Z",
-                False,
-            ),
-            "ends_before_within_slack": (
-                "2026-09-01T09:50:00Z",
-                "2026-09-01T09:56:45Z",
-                True,
-            ),
-            "ends_before_beyond_slack": (
-                "2026-09-01T09:50:00Z",
-                "2026-09-01T09:56:00Z",
-                False,
-            ),
-        }
-        for name, (started, ended, expected) in cases.items():
-            with self.subTest(name):
-                got = self.read([(1, change(at))], [episode(started, ended, "deploy")])
-                self.assertIs(got[0]["outage"], expected)
-
-    def test_change_without_duration_overlaps_at_its_instant(self):
-        got = self.read(
-            [(1, change("2026-09-01T10:00:00Z", duration_s=None))],
-            [episode("2026-09-01T10:00:30Z", "2026-09-01T10:03:00Z", "deploy")],
-        )
-        self.assertTrue(got[0]["outage"])
-
-    def test_only_an_episode_of_the_matching_cause_counts(self):
-        spot = episode("2026-09-01T10:01:00Z", "2026-09-01T10:05:00Z", "spot-reclaim")
-        refresh = change(
-            "2026-09-01T10:30:00Z", kind="instance-refresh", duration_s=1800
-        )
-        got = self.read([(1, refresh)], [spot])
-        self.assertIs(got[0]["outage"], False)
-        refreshed = episode(
-            "2026-09-01T10:01:00Z", "2026-09-01T10:05:00Z", "instance-refresh"
-        )
-        got = self.read([(1, refresh)], [refreshed])
-        self.assertIs(got[0]["outage"], True)
-
-    def test_a_deploy_episode_overlapping_a_user_deploy_is_an_outage(self):
-        got = self.read(
-            [(1, change("2026-09-01T10:00:00Z"))],
-            [episode("2026-09-01T09:59:00Z", "2026-09-01T10:03:00Z", "deploy")],
-        )
-        self.assertIs(got[0]["outage"], True)
-
-    def test_autoscaling_deployments_never_report_an_outage(self):
-        got = self.read(
-            [(1, change("2026-09-01T10:00:00Z", creator="autoscaling"))],
-            [episode("2026-09-01T09:59:00Z", "2026-09-01T10:03:00Z", "deploy")],
-        )
-        self.assertIs(got[0]["outage"], False)
-
     def test_malformed_lines_are_skipped(self):
         lines = [
             (1, "not json"),
@@ -2578,13 +2519,135 @@ class ChangesTests(unittest.TestCase):
             (6, json.dumps({"at": "2026-09-01T10:00:00Z"})),
             (7, json.dumps(change("2026-09-01T10:00:00Z"))),
         ]
-        with FakeLogs({EPISODES: change_rows(*lines)}).patch():
+        empty = {"MetricDataResults": [{"Id": "avg", "Timestamps": [], "Values": []}]}
+        with (
+            FakeLogs({EPISODES: change_rows(*lines)}).patch(),
+            mock.patch.object(
+                status.cloudwatch, "get_metric_data", return_value=empty, create=True
+            ),
+        ):
             got = status.changes(365, NOW)
         self.assertEqual([c["id"] for c in got], ["d-1"])
 
-    def test_no_episodes_means_no_outage(self):
-        got = self.read([(1, change("2026-09-01T10:00:00Z"))])
-        self.assertIs(got[0]["outage"], False)
+
+class ChangesDowntimeTests(unittest.TestCase):
+    """Changes measure downtime from SiteUp in the change window, not from
+    alarm-triggered episodes: a short dip during a deploy or refresh that never
+    opens an episode still shows its measured seconds in down_s.
+    """
+
+    def _run(self, changes, points_by_period=None):
+        points_by_period = points_by_period or {}
+        calls = []
+
+        def fake_get_metric_data(MetricDataQueries, StartTime, EndTime, ScanBy):
+            period = MetricDataQueries[0]["MetricStat"]["Period"]
+            calls.append((period, StartTime, EndTime))
+            pts = [
+                (ts, avg)
+                for ts, avg in points_by_period.get(period, [])
+                if StartTime <= ts < EndTime
+            ]
+            return {
+                "MetricDataResults": [
+                    {
+                        "Id": MetricDataQueries[0]["Id"],
+                        "Timestamps": [ts for ts, _ in pts],
+                        "Values": [avg for _, avg in pts],
+                    }
+                ]
+            }
+
+        rows = change_rows(*[(i + 1, c) for i, c in enumerate(changes)])
+        with (
+            FakeLogs({EPISODES: rows}).patch(),
+            mock.patch.object(
+                status.cloudwatch,
+                "get_metric_data",
+                side_effect=fake_get_metric_data,
+                create=True,
+            ),
+        ):
+            return status.changes(365, NOW), calls
+
+    def test_two_bad_minutes_with_no_episode_gives_120s(self):
+        # Change 5 days before NOW (within 60s retention), duration 120s ->
+        # [09:58, 10:00], window [09:56:30, 10:01:30]. No episodes logged.
+        pts = [
+            (dt(2026, 9, 10, 9, 57), 1.0),
+            (dt(2026, 9, 10, 9, 58), 1.0),
+            (dt(2026, 9, 10, 9, 59), 0.0),
+            (dt(2026, 9, 10, 10, 0), 0.0),
+            (dt(2026, 9, 10, 10, 1), 1.0),
+        ]
+        got, calls = self._run([change("2026-09-10T10:00:00Z")], {60: pts})
+        self.assertEqual(got[0]["down_s"], 120)
+        self.assertEqual([p for p, _, _ in calls], [60])
+
+    def test_300s_tier_for_changes_between_15_and_63_days_old(self):
+        # 30 days before NOW (2026-08-16): 5-minute bucket with 2 of 5 minutes down -> avg 0.6 -> 120s
+        pts = [
+            (dt(2026, 8, 16, 9, 55), 0.6),
+            (dt(2026, 8, 16, 10, 0), 1.0),
+        ]
+        got, calls = self._run([change("2026-08-16T10:00:00Z")], {300: pts})
+        self.assertEqual(got[0]["down_s"], 120)
+        self.assertEqual([p for p, _, _ in calls], [300])
+
+    def test_changes_older_than_63_days_get_none(self):
+        got, calls = self._run([change("2026-06-01T10:00:00Z")])
+        self.assertIsNone(got[0]["down_s"])
+        self.assertEqual(calls, [])
+
+    def test_all_up_gives_zero_and_missing_datapoints_give_none(self):
+        pts = [(dt(2026, 9, 10, 9, 59), 1.0), (dt(2026, 9, 10, 10, 0), 1.0)]
+        got, _ = self._run(
+            [
+                change("2026-09-10T10:00:00Z", id="up"),
+                change("2026-09-12T10:00:00Z", id="gap"),
+            ],
+            {60: pts},
+        )
+        by_id = {c["id"]: c["down_s"] for c in got}
+        self.assertEqual(by_id["up"], 0)
+        self.assertIsNone(by_id["gap"])
+
+    def test_one_get_metric_data_call_per_period_across_many_changes(self):
+        changes = [
+            change("2026-09-14T10:00:00Z", id="recent-1"),
+            change("2026-09-10T10:00:00Z", id="recent-2"),
+            change("2026-08-20T10:00:00Z", id="mid-1"),
+            change("2026-08-01T10:00:00Z", id="mid-2"),
+            change("2026-06-01T10:00:00Z", id="old"),
+        ]
+        got, calls = self._run(
+            changes,
+            {
+                60: [
+                    (dt(2026, 9, 14, 10, 0), 0.5),
+                    (dt(2026, 9, 10, 10, 0), 1.0),
+                ],
+                300: [
+                    (dt(2026, 8, 20, 9, 55), 0.8),
+                    (dt(2026, 8, 1, 9, 55), 1.0),
+                ],
+            },
+        )
+        self.assertEqual(sorted(p for p, _, _ in calls), [60, 300])
+        by_id = {c["id"]: c["down_s"] for c in got}
+        self.assertEqual(by_id["recent-1"], 30)
+        self.assertEqual(by_id["recent-2"], 0)
+        self.assertEqual(by_id["mid-1"], 60)
+        self.assertEqual(by_id["mid-2"], 0)
+        self.assertIsNone(by_id["old"])
+
+    def test_change_without_duration_uses_slack_around_at(self):
+        pts = [(dt(2026, 9, 10, 10, 0), 0.0)]
+        got, _ = self._run(
+            [change("2026-09-10T10:00:00Z", duration_s=None)],
+            {60: pts},
+        )
+        self.assertEqual(got[0]["down_s"], 60)
 
 
 class InterruptionsTests(unittest.TestCase):
@@ -2768,7 +2831,7 @@ class PublicResponseTests(unittest.TestCase):
                 return_value=[
                     {
                         **change("2026-09-01T10:00:00Z"),
-                        "outage": True,
+                        "down_s": 120,
                         "description": "x",
                     }
                 ],
@@ -2817,9 +2880,9 @@ class PublicResponseTests(unittest.TestCase):
         changes = [
             {
                 **change("2026-09-01T10:00:00Z", id="a", creator="autoscaling"),
-                "outage": False,
+                "down_s": 0,
             },
-            {**change("2026-09-02T10:00:00Z", id="b", creator="user"), "outage": False},
+            {**change("2026-09-02T10:00:00Z", id="b", creator="user"), "down_s": 0},
             {
                 **change(
                     "2026-09-03T10:00:00Z",
@@ -2827,7 +2890,7 @@ class PublicResponseTests(unittest.TestCase):
                     kind="instance-refresh",
                     creator=None,
                 ),
-                "outage": False,
+                "down_s": 0,
             },
         ]
         with mock.patch.object(status, "changes", return_value=changes):

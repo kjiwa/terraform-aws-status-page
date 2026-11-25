@@ -69,16 +69,20 @@ for (const { name, toggles } of COMBOS) {
     // DEFAULT_RANGE is "30d"; RANGES' own cell count for it
     // is 30, independent of every toggle above.
     await expect(
-      page.locator('.card', { hasText: 'Reliability' }).locator('.strip > div'),
+      page
+        .locator('.card', { has: page.locator('h3', { hasText: /^Reliability$/ }) })
+        .locator('.strip > div'),
     ).toHaveCount(30);
 
-    const legend = page.locator('.card', { hasText: 'Reliability' }).locator('.legend-groups');
+    const legend = page
+      .locator('.card', { has: page.locator('h3', { hasText: /^Reliability$/ }) })
+      .locator('.legend-groups');
     await expect(legend).toContainText('≥99.9%');
     await expect(legend).toContainText('no data');
     await expect(legend).toContainText('in progress');
 
     const latencyKey = page
-      .locator('.card', { hasText: 'Reliability' })
+      .locator('.card', { has: page.locator('h3', { hasText: /^Reliability$/ }) })
       .locator('.chart-key')
       .first();
     await expect(latencyKey).toContainText('p50');

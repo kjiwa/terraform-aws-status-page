@@ -371,12 +371,20 @@ export function Incidents({
   if (!Array.isArray(d) || d.length === 0) {
     return (
       <Card title="Incidents">
+        <p class="note">
+          Outages long enough to raise the site-down alarm; shorter dips show on the Reliability
+          strip and in Changes.
+        </p>
         <p class="note">No incidents in the last year.</p>
       </Card>
     );
   }
   return (
     <Card title="Incidents">
+      <p class="note">
+        Outages long enough to raise the site-down alarm; shorter dips show on the Reliability strip
+        and in Changes.
+      </p>
       <IncidentsBody
         d={d}
         interruptions={interruptions}

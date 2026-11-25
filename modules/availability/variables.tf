@@ -24,7 +24,7 @@ variable "alert_email" {
 }
 
 variable "canary_enabled" {
-  description = "If false, an external publisher sends SiteUp every minute and the Lambda runs no probe: its schedule writes SiteUp = 0 for each minute the publisher missed, so a silent publisher counts as down."
+  description = "If false, an external publisher sends one SiteUp sample per calendar minute, timestamped to that minute, and the Lambda runs no probe: its schedule writes SiteUp = 0 for each minute the publisher missed, so a silent publisher counts as down."
   type        = bool
   default     = true
 }

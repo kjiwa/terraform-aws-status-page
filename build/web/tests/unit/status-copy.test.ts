@@ -54,6 +54,20 @@ describe('captions', () => {
     const card = (await cardsOf(payloadFor(ALL_TOGGLES_ON)))('Cost (month to date)');
     expect(text(card)).toContain('Account-wide, month to date through yesterday (UTC)');
   });
+
+  it('Changes names the SiteUp downtime measurement and its retention scope', async () => {
+    const card = (await cardsOf(payloadFor(ALL_TOGGLES_ON)))('Changes');
+    expect(text(card)).toContain(
+      'Downtime is SiteUp loss during each change (90 s slack on either side), measured at 1-minute resolution for 15 days and 5-minute for 63 days; older changes show a dash.',
+    );
+  });
+
+  it('Incidents explains that only alarm-length outages appear there', async () => {
+    const card = (await cardsOf(payloadFor(ALL_TOGGLES_ON)))('Incidents');
+    expect(text(card)).toContain(
+      'Outages long enough to raise the site-down alarm; shorter dips show on the Reliability strip and in Changes.',
+    );
+  });
 });
 
 describe('plain-language names and identifiers', () => {
